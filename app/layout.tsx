@@ -10,7 +10,7 @@ export default function RootLayout({
 }) {
     return (
         <html lang="en" suppressHydrationWarning>
-        <body className="bg-gray-100 text-gray-900">
+        <body className="bg-gray-100 dark:bg-black text-gray-900 dark:text-white transition-colors duration-300">
         <Providers>
             <Navbar />
             <HelpPanel />

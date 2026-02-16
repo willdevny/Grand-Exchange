@@ -2,7 +2,7 @@ export default function Home() {
     return (
         <div className="space-y-10">
             {/* Hero / Greeting Section */}
-            <section className="bg-white border-4 border-black rounded-xl p-8">
+            <section className="card p-8">
                 <h1 className="text-4xl font-extrabold mb-4">
                     The Grand Exchange
                 </h1>
@@ -12,7 +12,7 @@ export default function Home() {
                     to help you make informed investment decisions with confidence.
                 </p>
 
-                <p className="text-base text-gray-700">
+                <p className="text-base text-gray-700 dark:text-gray-300">
                     Use the navigation bar above to explore market trends, analyze stock
                     performance, and leverage AI-driven insights — all in one place.
                 </p>
@@ -49,11 +49,11 @@ function FeatureCard({
     description: string
 }) {
     return (
-        <div className="bg-white border-4 border-black rounded-xl p-6">
+        <div className="card p-6">
             <h2 className="text-xl font-bold mb-2">
                 {title}
             </h2>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
                 {description}
             </p>
         </div>

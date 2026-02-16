@@ -1,13 +1,12 @@
 export default function TrendingPage() {
     return (
         <div className="space-y-10">
-            {/* Hero / Greeting Section */}
-            <section className="bg-white border-4 border-black rounded-xl p-8">
+            <section className="card p-8">
                 <h1 className="text-4xl font-extrabold mb-4">
                     Trending Stocks
                 </h1>
 
-                <p className="text-lg mb-4">
+                <p className="text-lg mb-4 text-gray-700 dark:text-gray-300">
                     Below are some of this weeks most popular stocks -
                 </p>
             </section>
