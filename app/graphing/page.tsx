@@ -249,6 +249,14 @@ export default function GraphingPage() {
         //clear chart before attempting to render
         svg.selectAll("*").remove();
 
+        // Detect dark mode from html class (works with your existing toggle)
+        const isDark =
+            typeof document !== "undefined" &&
+            document.documentElement.classList.contains("dark");
+
+        const axisColor = isDark ? "#e5e7eb" : "#111827"; // light gray vs near-black
+        const gridColor = isDark ? "rgba(229,231,235,0.25)" : "#e5e7eb";
+
         //create inner group for chart content
         const g = svg.append("g").attr(
             "transform",
@@ -275,7 +283,7 @@ export default function GraphingPage() {
             .domain(dates)
             .range([0, width]);
 
-// ----- Y SCALE -----
+        // ----- Y SCALE -----
 
         const yMin = d3.min(allValues, d => d.close) ?? 0;
         const yMax = d3.max(allValues, d => d.close) ?? 0;
@@ -286,19 +294,19 @@ export default function GraphingPage() {
             .range([height, 0])
             .nice();
 
-// ----- LINE -----
+        // ----- LINE -----
 
         const line = d3
             .line<DataPoint>()
             .x(d => xScale(d.date) ?? 0)
             .y(d => yScale(d.close));
 
-// ----- AXIS -----
+        // ----- AXIS -----
 
         const formatDay = d3.timeFormat("%b %d");
         const formatMonth = d3.timeFormat("%b '%y");
 
-// With scalePoint, we manually control ticks
+        // With scalePoint, we manually control ticks
         let tickValues: Date[];
 
         if (selectedRangeDays <= 14) {
@@ -357,34 +365,32 @@ export default function GraphingPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-gray-50 py-10 px-4">
+        <div className="py-10 px-4">
             <div className="max-w-6xl mx-auto space-y-8">
-
                 {/* Header */}
-                <div>
-                    <h1 className="text-4xl font-bold tracking-tight text-gray-900">
-                        Stock Dashboard
+                <div className="card p-6">
+                    <h1 className="text-4xl font-bold tracking-tight">
+                        Stock Graphing Dashboard
                     </h1>
-                    <p className="text-gray-500 mt-1">
+                    <p className="mt-1 text-gray-700 dark:text-gray-300">
                         Visualize and compare stock performance over time
                     </p>
                 </div>
 
                 {/* Controls Card */}
-                <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
-
+                <div className="card p-6 space-y-6">
                     {/* Add Stock */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                             Add Stock
                         </label>
 
-                        <div className="flex rounded-lg overflow-hidden border border-gray-300 focus-within:ring-2 focus-within:ring-black">
+                        <div className="flex rounded-lg overflow-hidden border-4 border-black dark:border-white/20 focus-within:ring-2 focus-within:ring-black">
                             <input
                                 value={symbolInput}
                                 onChange={(e) => setSymbolInput(e.target.value)}
                                 placeholder="Enter ticker (AAPL)"
-                                className="flex-1 px-4 py-2 outline-none"
+                                className="flex-1 px-4 py-2 outline-none bg-white dark:bg-gray-900 dark:text-white"
                             />
                             <button
                                 onClick={handleAddStock}
@@ -397,17 +403,15 @@ export default function GraphingPage() {
 
                     {/* Range Selector + Average Toggle */}
                     <div className="flex flex-wrap items-center justify-between gap-4">
-
-                        {/* Segmented Range Control */}
-                        <div className="inline-flex rounded-lg bg-gray-100 p-1">
+                        <div className="inline-flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
                             {ranges.map((range) => (
                                 <button
                                     key={range.label}
                                     onClick={() => setSelectedRangeDays(range.days)}
                                     className={`px-4 py-1 rounded-md text-sm font-medium transition ${
                                         selectedRangeDays === range.days
-                                            ? "bg-white shadow text-black"
-                                            : "text-gray-600 hover:text-black"
+                                            ? "bg-white dark:bg-gray-900 shadow text-black dark:text-white"
+                                            : "text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white"
                                     }`}
                                 >
                                     {range.label}
@@ -415,10 +419,9 @@ export default function GraphingPage() {
                             ))}
                         </div>
 
-                        {/* Add Average Button */}
                         <button
                             onClick={handleAddAverage}
-                            className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition text-sm font-medium"
+                            className="px-4 py-2 rounded-lg border-4 border-black dark:border-white/20 hover:bg-gray-100 dark:hover:bg-gray-800 transition text-sm font-medium"
                         >
                             Add Average
                         </button>
@@ -426,21 +429,17 @@ export default function GraphingPage() {
 
                     {/* Legend */}
                     {stocks.length > 0 && (
-                        <div className="flex flex-wrap gap-6 pt-2 border-t border-gray-100">
+                        <div className="flex flex-wrap gap-6 pt-2 border-t border-black/10 dark:border-white/10">
                             {stocks.map((stock) => (
-                                <div
-                                    key={stock.symbol}
-                                    className="flex items-center gap-2"
-                                >
+                                <div key={stock.symbol} className="flex items-center gap-2">
                                     <div
                                         className="w-3 h-3 rounded-full"
                                         style={{ backgroundColor: stock.color }}
                                     />
-                                    <span className="text-sm font-medium text-gray-700">
-                  {stock.symbol}
-                </span>
+                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {stock.symbol}
+                  </span>
 
-                                    {/* Color Picker */}
                                     <input
                                         type="color"
                                         value={stock.color || "#000000"}
@@ -471,12 +470,10 @@ export default function GraphingPage() {
                 </div>
 
                 {/* Chart Card */}
-                <div className="bg-white rounded-2xl shadow-lg p-6">
+                <div className="card p-6">
                     {stocks.length === 0 ? (
-                        <div className="text-center py-20 text-gray-400">
-                            <p className="text-lg font-medium">
-                                No stocks added yet
-                            </p>
+                        <div className="text-center py-20 text-gray-500 dark:text-gray-400">
+                            <p className="text-lg font-medium">No stocks added yet</p>
                             <p className="text-sm mt-2">
                                 Add a ticker above to start visualizing performance.
                             </p>
@@ -487,15 +484,14 @@ export default function GraphingPage() {
                                 ref={svgRef}
                                 width={800}
                                 height={400}
-                                className="rounded-lg"
+                                className="rounded-lg bg-white dark:bg-gray-950"
                             />
                         </div>
                     )}
                 </div>
 
                 {/* Import / Export Card */}
-                <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-wrap items-center justify-between gap-4">
-
+                <div className="card p-6 flex flex-wrap items-center justify-between gap-4">
                     <div className="flex gap-3">
                         <button
                             onClick={handleExport}
@@ -504,7 +500,7 @@ export default function GraphingPage() {
                             Export JSON
                         </button>
 
-                        <label className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition text-sm cursor-pointer">
+                        <label className="px-4 py-2 rounded-lg border-4 border-black dark:border-white/20 hover:bg-gray-100 dark:hover:bg-gray-800 transition text-sm cursor-pointer">
                             Import JSON
                             <input
                                 type="file"
@@ -516,11 +512,10 @@ export default function GraphingPage() {
                         </label>
                     </div>
 
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-gray-700 dark:text-gray-400">
                         Save and load your custom chart configurations
                     </p>
                 </div>
-
             </div>
         </div>
     );
