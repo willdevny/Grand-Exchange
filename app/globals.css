@@ -1,0 +1,17 @@
+@custom-variant dark (&:where(.dark, .dark *));
+
+@import "tailwindcss";
+
+html,
+body {
+    height: 100%;
+}
+
+* {
+    transition-property: background-color, color, border-color;
+    transition-duration: 300ms;
+}
+
+.card {
+    @apply bg-white dark:bg-gray-900 border-4 border-black dark:border-white/20 rounded-xl;
+}
