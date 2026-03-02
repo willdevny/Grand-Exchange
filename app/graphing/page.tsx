@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
+import * as d3 from "d3";
+
 //type used for stock representation
 type importedStock = {
     symbol: string; //stock ticker ex. MSFT, APPL, etc.
@@ -10,9 +13,10 @@ type importedStock = {
     color?: string; //stores the assigned color
 };
 
-
-import { useEffect, useRef, useState } from "react";
-import * as d3 from "d3";
+type StockApiResponseItem = {
+    date: string;
+    close: number;
+};
 
 //represents a single datapoint on a line
 type DataPoint = {
@@ -26,6 +30,40 @@ type Stock = {
     color?: string;
 };
 
+type ViewMode = "compare" | "single";
+
+function StockDetails({ stock }: { stock: Stock }) {
+    if (!stock.values.length) return null;
+
+    const latest = stock.values[stock.values.length - 1];
+    const first = stock.values[0];
+
+    const change = latest.close - first.close;
+    const percentChange = (change / first.close) * 100;
+
+    const high = Math.max(...stock.values.map(v => v.close));
+    const low = Math.min(...stock.values.map(v => v.close));
+
+    return (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <DetailItem label="Latest Close" value={`$${latest.close.toFixed(2)}`} />
+            <DetailItem label="6M Change" value={`$${change.toFixed(2)}`} />
+            <DetailItem label="% Change" value={`${percentChange.toFixed(2)}%`} />
+            <DetailItem label="6M High" value={`$${high.toFixed(2)}`} />
+            <DetailItem label="6M Low" value={`$${low.toFixed(2)}`} />
+        </div>
+    );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="bg-gray-50 p-4 rounded-xl">
+            <div className="text-xs text-gray-500">{label}</div>
+            <div className="text-lg font-semibold">{value}</div>
+        </div>
+    );
+}
+
 export default function GraphingPage() {
     // used for manipulating the chart <svg>
     const svgRef = useRef<SVGSVGElement | null>(null);
@@ -35,6 +73,12 @@ export default function GraphingPage() {
     const [selectedRangeDays, setSelectedRangeDays] = useState<number>(365);
     //controls input for stock ticker text field
     const [symbolInput, setSymbolInput] = useState("");
+    //stores error messages meant for diaply
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    //controls viewmode
+    const [viewMode, setViewMode] = useState<"compare" | "single">("compare");
+    //stores specific stock for single viewmode
+    const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
 
     //chart margins
     const margin = { top: 20, right: 30, bottom: 40, left: 50 };
@@ -48,55 +92,80 @@ export default function GraphingPage() {
     // -----------------------
     // Fetch stock data via server API (WORK IN PROGRESS)
     // -----------------------
+    const MAX_API_DAYS = 182; // ~6 months
 
-    // async function fetchStockData(symbol: string): Promise<DataPoint[]> {
-    //     try {
-    //         const res = await fetch(
-    //             `/api/stock/${symbol}?rangeDays=${selectedRangeDays}`
-    //         );
-    //         const data = await res.json();
-    //
-    //         if (!Array.isArray(data) || data.length === 0) return [];
-    //
-    //         return data.map((item: any) => ({
-    //             date: new Date(item.date),
-    //             close: item.close,
-    //         }));
-    //     } catch (err) {
-    //         console.error("Failed to fetch stock data:", err);
-    //         return [];
-    //     }
-    // }
-
-    // Generate random stock data
     async function fetchStockData(symbol: string): Promise<DataPoint[]> {
-        const data: DataPoint[] = [];
-        const today = new Date();
-        let price = Math.random() * 100;
+        try {
+            // determine actual request range
 
-        const currentDate = new Date(today);
-        let daysGenerated = 0;
+            const res = await fetch(`/api/stock/${symbol}?rangeDays=${MAX_API_DAYS}`);
 
-        while (daysGenerated < selectedRangeDays) {
-            const day = currentDate.getDay();
-
-            // 0 = Sunday, 6 = Saturday
-            if (day !== 0 && day !== 6) {
-                price = price * (1 + (Math.random() - 0.5) * 0.02);
-
-                data.unshift({
-                    date: new Date(currentDate),
-                    close: parseFloat(price.toFixed(2)),
-                });
-
-                daysGenerated++;
+            if (!res.ok) {
+                const text = await res.text();
+                console.error("API Error:", res.status, text);
+                return [];
             }
 
-            currentDate.setDate(currentDate.getDate() - 1);
-        }
+            const raw = await res.json();
+            console.log("RAW RESPONSE FULL:", JSON.stringify(raw, null, 2));
 
-        return data;
+            if (!raw.data || !Array.isArray(raw.data)) {
+                console.error("Unexpected API shape:", raw);
+                return [];
+            }
+
+            // Parse dates as UTC
+            const data: DataPoint[] = raw.data.map((item: StockApiResponseItem) => ({
+                date: new Date(item.date),
+                close: Number(item.close),
+            }));
+
+            // Sort oldest first
+            data.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+            // Slice to the client’s requested range (if user selected more than 6 months)
+            const cutoffDate = new Date(Date.now() - selectedRangeDays * 24 * 60 * 60 * 1000);
+
+            const slicedData = data.filter(d => d.date >= cutoffDate);
+
+            console.log(`Fetched ${slicedData.length} valid points for ${symbol}`);
+
+            return slicedData;
+        } catch (err) {
+            console.error("Failed to fetch stock data:", err);
+            return [];
+        }
     }
+
+    // Generate random stock data
+    // async function fetchStockData(symbol: string): Promise<DataPoint[]> {
+    //     const data: DataPoint[] = [];
+    //     const today = new Date();
+    //     let price = Math.random() * 100;
+    //
+    //     const currentDate = new Date(today);
+    //     let daysGenerated = 0;
+    //
+    //     while (daysGenerated < selectedRangeDays) {
+    //         const day = currentDate.getDay();
+    //
+    //         // 0 = Sunday, 6 = Saturday
+    //         if (day !== 0 && day !== 6) {
+    //             price = price * (1 + (Math.random() - 0.5) * 0.02);
+    //
+    //             data.unshift({
+    //                 date: new Date(currentDate),
+    //                 close: parseFloat(price.toFixed(2)),
+    //             });
+    //
+    //             daysGenerated++;
+    //         }
+    //
+    //         currentDate.setDate(currentDate.getDate() - 1);
+    //     }
+    //
+    //     return data;
+    // }
 
     // -----------------------
     // Add stock
@@ -104,17 +173,27 @@ export default function GraphingPage() {
     async function handleAddStock() {
         const symbol = symbolInput.toUpperCase();
 
-        //prevents duplicates
-        if (stocks.find((s) => s.symbol === symbol)) return;
+        if (!symbol) return;
 
         const values = await fetchStockData(symbol);
         if (values.length === 0) {
-            alert(`Could not fetch data for ${symbol}.`);
+            setErrorMessage(`Could not fetch data for ${symbol}.`);
             return;
         }
+        else{
+            setErrorMessage(null)
+        }
 
-        //add stock to state
-        setStocks([...stocks, { symbol, values, color: colorScale(symbol) }]);
+        const newStock = { symbol, values, color: colorScale(symbol) };
+
+        if (viewMode === "single") {
+            setSelectedStock(newStock);
+            setStocks([newStock]); // optional: clear others
+        } else {
+            if (stocks.find((s) => s.symbol === symbol)) return;
+            setStocks([...stocks, newStock]);
+        }
+
         setSymbolInput("");
     }
 
@@ -136,31 +215,27 @@ export default function GraphingPage() {
     function calculateAverageStock(stocks: Stock[]): Stock | null {
         if (stocks.length === 0) return null;
 
-        // Assume all stocks share same date structure (true for your generated data)
-        const length = stocks[0].values.length;
+        // Collect all unique dates across all stocks
+        const allDates = Array.from(
+            new Set(stocks.flatMap(s => s.values.map(v => v.date.getTime())))
+        )
+            .sort((a: number, b: number) => a - b)
+            .map(t => new Date(t));
 
-        const averagedValues: DataPoint[] = [];
+        const averagedValues: DataPoint[] = allDates.map(date => {
+            const values = stocks.map(
+                s => s.values.find(v => v.date.getTime() === date.getTime())?.close
+            );
 
-        for (let i = 0; i < length; i++) {
-            const date = stocks[0].values[i].date;
+            const numericValues = values.map(v => v ?? 0);
+            const avg = numericValues.reduce((sum, v) => sum + v, 0) / stocks.length;
 
-            const avg =
-                stocks.reduce((sum, stock) => {
-                    const value = stock.values[i]?.close;
-                    return sum + (value ?? 0);
-                }, 0) / stocks.length;
+            return { date, close: avg };
+        });
 
-            averagedValues.push({
-                date,
-                close: avg,
-            });
-        }
+        console.log("Calculated average stock with", averagedValues.length, "points");
 
-        return {
-            symbol: "AVERAGE",
-            values: averagedValues,
-            color: "#000000",
-        };
+        return { symbol: "AVERAGE", values: averagedValues, color: "#000000" };
     }
 
     // -----------------------
@@ -203,8 +278,11 @@ export default function GraphingPage() {
 
                 // Validate json format: must be an array of { symbol, values }
                 if (!Array.isArray(json)) {
-                    alert(`File ${file.name} is not valid JSON array`);
+                    setErrorMessage(`File ${file.name} is not valid JSON array`);
                     continue;
+                }
+                else{
+                    setErrorMessage(null);
                 }
 
                 const importedStocks: Stock[] = (json as importedStock[]).map((s) => ({
@@ -224,12 +302,12 @@ export default function GraphingPage() {
                             newStocks.push(s);
                         }
                     });
+                    setErrorMessage(null);
                     return newStocks;
                 });
-
             } catch (err) {
                 console.error("Failed to import JSON:", err);
-                alert(`Failed to import file ${file.name}: ${err}`);
+                setErrorMessage(`Failed to import file ${file.name}: ${err}`);
             }
         }
 
@@ -241,110 +319,92 @@ export default function GraphingPage() {
     // -----------------------
     // Chart Rendering
     // -----------------------
+    // -----------------------
+// Chart Rendering
+// -----------------------
     useEffect(() => {
         if (!svgRef.current) return;
 
         const svg = d3.select(svgRef.current);
+        svg.selectAll("*").remove(); // clear previous chart
 
-        //clear chart before attempting to render
-        svg.selectAll("*").remove();
-
-        // Detect dark mode from html class (works with your existing toggle)
-        const isDark =
-            typeof document !== "undefined" &&
-            document.documentElement.classList.contains("dark");
-
-        const axisColor = isDark ? "#e5e7eb" : "#111827"; // light gray vs near-black
-        const gridColor = isDark ? "rgba(229,231,235,0.25)" : "#e5e7eb";
-
-        //create inner group for chart content
-        const g = svg.append("g").attr(
-            "transform",
-            `translate(${margin.left},${margin.top})`
-        );
-
-        // cuts off data outside of selected range
         if (stocks.length === 0) return;
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        if (stocks.length > 0 && stocks[0].values.length > 0) {
+            console.log(
+                "Date test:",
+                stocks[0].values[0].date,
+                stocks[0].values[0].date instanceof Date,
+                isNaN(stocks[0].values[0].date.getTime())
+            );
+        }
+
+        const cutoffDate = new Date(Date.now() - selectedRangeDays * 24 * 60 * 60 * 1000);
 
         const stocksToRender = stocks.map(stock => ({
             ...stock,
-            values: stock.values.slice(-selectedRangeDays)
+            values: stock.values
+                .filter(v => v.date >= cutoffDate)
+                .filter(v => !isNaN(v.date.getTime())),
         }));
 
-        // Flatten all values
-        const allValues = stocksToRender.flatMap((s) => s.values);
-
-        // ----- X SCALE (Trading Days Evenly Spaced) -----
-
-        const dates = allValues.map(d => d.date);
-
-        const xScale = d3
-            .scalePoint<Date>()
-            .domain(dates)
-            .range([0, width]);
-
-        // ----- Y SCALE -----
-
-        const yMin = d3.min(allValues, d => d.close) ?? 0;
-        const yMax = d3.max(allValues, d => d.close) ?? 0;
-
-        const yScale = d3
-            .scaleLinear()
-            .domain([yMin, yMax])
-            .range([height, 0])
-            .nice();
-
-        // ----- LINE -----
-
-        const line = d3
-            .line<DataPoint>()
-            .x(d => xScale(d.date) ?? 0)
-            .y(d => yScale(d.close));
-
-        // ----- AXIS -----
-
-        const formatDay = d3.timeFormat("%b %d");
-        const formatMonth = d3.timeFormat("%b '%y");
-
-        // With scalePoint, we manually control ticks
-        let tickValues: Date[];
-
-        if (selectedRangeDays <= 14) {
-            tickValues = dates.filter((_, i) => i % 2 === 0);
-        } else if (selectedRangeDays <= 60) {
-            tickValues = dates.filter((_, i) => i % 5 === 0);
-        } else if (selectedRangeDays <= 200) {
-            tickValues = dates.filter((_, i) => i % 21 === 0); // ~monthly trading days
-        } else {
-            tickValues = dates.filter((_, i) => i % 42 === 0); // ~2 months
+        const allValues = stocksToRender.flatMap(s => s.values);
+        if (allValues.length === 0) {
+            console.warn("No valid data points to render chart.");
+            return;
         }
 
-        const xAxis = d3
-            .axisBottom<Date>(xScale)
-            .tickValues(tickValues)
-            .tickFormat(selectedRangeDays <= 60 ? formatDay : formatMonth);
+        // ----- X SCALE -----
+        const dates = allValues.map(d => d.date);
+        const xExtent = d3.extent(dates) as [Date, Date];
+        if (!xExtent[0] || !xExtent[1]) {
+            console.warn("Invalid xExtent:", xExtent);
+            return;
+        }
 
+        const xScale = d3.scaleTime().domain(xExtent).range([0, width]);
 
-        g.append("g")
-            .attr("transform", `translate(0,${height})`)
-            .call(xAxis);
+        // ----- Y SCALE -----
+        const yMin = d3.min(allValues, d => d.close) ?? 0;
+        const yMax = d3.max(allValues, d => d.close) ?? 1;
+        const yScale = d3.scaleLinear().domain([yMin, yMax]).range([height, 0]).nice();
+
+        // ----- LINE GENERATOR -----
+        const line = d3.line<DataPoint>()
+            .defined(d => d.date instanceof Date && !isNaN(d.date.getTime()))
+            .x(d => xScale(d.date))
+            .y(d => yScale(d.close));
+
+        // ----- AXES -----
+        const formatDay = d3.timeFormat("%b %d");
+        const formatMonth = d3.timeFormat("%b '%y");
+        const xAxis = d3.axisBottom<Date>(xScale)
+            .ticks(Math.min(10, selectedRangeDays))
+            .tickFormat(d => d instanceof Date ? (selectedRangeDays <= 60 ? formatDay(d) : formatMonth(d)) : "");
+
+        g.append("g").attr("transform", `translate(0,${height})`).call(xAxis);
         g.append("g").call(d3.axisLeft(yScale));
 
+        // Grid
         g.append("g")
             .attr("class", "grid")
-            .call(
-                d3.axisLeft(yScale)
-                    .tickSize(-width)
-                    .tickFormat(() => "")
-            )
+            .call(d3.axisLeft(yScale).tickSize(-width).tickFormat(() => ""))
             .selectAll("line")
             .attr("stroke", "#e5e7eb");
 
-        stocksToRender.forEach((stock) => {
+        // ----- DRAW LINES -----
+        stocksToRender.forEach(stock => {
+            if (stock.values.length === 0) {
+                console.warn(`Skipping ${stock.symbol}, no points to draw`);
+                return;
+            }
+
             g.append("path")
                 .datum(stock.values)
                 .attr("fill", "none")
-                .attr("stroke", stock.color!)
+                .attr("stroke", stock.color || "#000000")
                 .attr("stroke-width", stock.symbol === "AVERAGE" ? 3 : 2)
                 .attr("d", line)
                 .attr("opacity", 0)
@@ -352,6 +412,8 @@ export default function GraphingPage() {
                 .duration(500)
                 .attr("opacity", 1);
         });
+
+        console.log("Chart rendered for stocks:", stocksToRender.map(s => s.symbol));
     }, [stocks, selectedRangeDays]);
 
     // -----------------------
@@ -360,37 +422,63 @@ export default function GraphingPage() {
     const ranges = [
         { label: "7D", days: 7 },
         { label: "30D", days: 30 },
-        { label: "6M", days: 182 },
-        { label: "1YR", days: 365 },
+        { label: "6M", days: 182 }
     ];
 
     return (
-        <div className="py-10 px-4">
+        <div className="min-h-screen bg-gray-50 py-10 px-4">
             <div className="max-w-6xl mx-auto space-y-8">
+
                 {/* Header */}
-                <div className="card p-6">
-                    <h1 className="text-4xl font-bold tracking-tight">
-                        Stock Graphing Dashboard
+                <div>
+                    <h1 className="text-4xl font-bold tracking-tight text-gray-900">
+                        Stock Dashboard
                     </h1>
-                    <p className="mt-1 text-gray-700 dark:text-gray-300">
+                    <p className="text-gray-500 mt-1">
                         Visualize and compare stock performance over time
                     </p>
                 </div>
 
+                {/*viewmode select card*/}
+                <div className="inline-flex rounded-lg bg-gray-100 p-1">
+                    <button
+                        onClick={() => setViewMode("compare")}
+                        className={`px-4 py-1 rounded-md text-sm font-medium transition ${
+                            viewMode === "compare"
+                                ? "bg-white shadow text-black"
+                                : "text-gray-600 hover:text-black"
+                        }`}
+                    >
+                        Compare
+                    </button>
+
+                    <button
+                        onClick={() => setViewMode("single")}
+                        className={`px-4 py-1 rounded-md text-sm font-medium transition ${
+                            viewMode === "single"
+                                ? "bg-white shadow text-black"
+                                : "text-gray-600 hover:text-black"
+                        }`}
+                    >
+                        Single Stock
+                    </button>
+                </div>
+
                 {/* Controls Card */}
-                <div className="card p-6 space-y-6">
+                <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
+
                     {/* Add Stock */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
                             Add Stock
                         </label>
 
-                        <div className="flex rounded-lg overflow-hidden border-4 border-black dark:border-white/20 focus-within:ring-2 focus-within:ring-black">
+                        <div className="flex rounded-lg overflow-hidden border border-gray-300 focus-within:ring-2 focus-within:ring-black">
                             <input
                                 value={symbolInput}
                                 onChange={(e) => setSymbolInput(e.target.value)}
                                 placeholder="Enter ticker (AAPL)"
-                                className="flex-1 px-4 py-2 outline-none bg-white dark:bg-gray-900 dark:text-white"
+                                className="flex-1 px-4 py-2 outline-none"
                             />
                             <button
                                 onClick={handleAddStock}
@@ -401,17 +489,31 @@ export default function GraphingPage() {
                         </div>
                     </div>
 
+                    {errorMessage && (
+                        <div className="mt-3 flex items-center justify-between rounded-lg bg-red-50 border border-red-200 px-4 py-2">
+                            <span className="text-sm text-red-700">{errorMessage}</span>
+                            <button
+                                onClick={() => setErrorMessage(null)}
+                                className="text-xs font-medium text-red-500 hover:text-red-700"
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    )}
+
                     {/* Range Selector + Average Toggle */}
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div className="inline-flex rounded-lg bg-gray-100 dark:bg-gray-800 p-1">
+
+                        {/* Segmented Range Control */}
+                        <div className="inline-flex rounded-lg bg-gray-100 p-1">
                             {ranges.map((range) => (
                                 <button
                                     key={range.label}
                                     onClick={() => setSelectedRangeDays(range.days)}
                                     className={`px-4 py-1 rounded-md text-sm font-medium transition ${
                                         selectedRangeDays === range.days
-                                            ? "bg-white dark:bg-gray-900 shadow text-black dark:text-white"
-                                            : "text-gray-600 dark:text-gray-300 hover:text-black dark:hover:text-white"
+                                            ? "bg-white shadow text-black"
+                                            : "text-gray-600 hover:text-black"
                                     }`}
                                 >
                                     {range.label}
@@ -419,9 +521,10 @@ export default function GraphingPage() {
                             ))}
                         </div>
 
+                        {/* Add Average Button */}
                         <button
                             onClick={handleAddAverage}
-                            className="px-4 py-2 rounded-lg border-4 border-black dark:border-white/20 hover:bg-gray-100 dark:hover:bg-gray-800 transition text-sm font-medium"
+                            className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition text-sm font-medium"
                         >
                             Add Average
                         </button>
@@ -429,17 +532,21 @@ export default function GraphingPage() {
 
                     {/* Legend */}
                     {stocks.length > 0 && (
-                        <div className="flex flex-wrap gap-6 pt-2 border-t border-black/10 dark:border-white/10">
+                        <div className="flex flex-wrap gap-6 pt-2 border-t border-gray-100">
                             {stocks.map((stock) => (
-                                <div key={stock.symbol} className="flex items-center gap-2">
+                                <div
+                                    key={stock.symbol}
+                                    className="flex items-center gap-2"
+                                >
                                     <div
                                         className="w-3 h-3 rounded-full"
                                         style={{ backgroundColor: stock.color }}
                                     />
-                                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {stock.symbol}
-                  </span>
+                                    <span className="text-sm font-medium text-gray-700">
+                  {stock.symbol}
+                </span>
 
+                                    {/* Color Picker */}
                                     <input
                                         type="color"
                                         value={stock.color || "#000000"}
@@ -470,10 +577,12 @@ export default function GraphingPage() {
                 </div>
 
                 {/* Chart Card */}
-                <div className="card p-6">
+                <div className="bg-white rounded-2xl shadow-lg p-6">
                     {stocks.length === 0 ? (
-                        <div className="text-center py-20 text-gray-500 dark:text-gray-400">
-                            <p className="text-lg font-medium">No stocks added yet</p>
+                        <div className="text-center py-20 text-gray-400">
+                            <p className="text-lg font-medium">
+                                No stocks added yet
+                            </p>
                             <p className="text-sm mt-2">
                                 Add a ticker above to start visualizing performance.
                             </p>
@@ -484,14 +593,25 @@ export default function GraphingPage() {
                                 ref={svgRef}
                                 width={800}
                                 height={400}
-                                className="rounded-lg bg-white dark:bg-gray-950"
+                                className="rounded-lg"
                             />
                         </div>
                     )}
                 </div>
 
+                {viewMode === "single" && selectedStock && (
+                    <div className="bg-white rounded-2xl shadow-lg p-6 space-y-4">
+                        <h2 className="text-xl font-semibold">
+                            {selectedStock.symbol} Overview
+                        </h2>
+
+                        <StockDetails stock={selectedStock} />
+                    </div>
+                )}
+
                 {/* Import / Export Card */}
-                <div className="card p-6 flex flex-wrap items-center justify-between gap-4">
+                <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-wrap items-center justify-between gap-4">
+
                     <div className="flex gap-3">
                         <button
                             onClick={handleExport}
@@ -500,7 +620,7 @@ export default function GraphingPage() {
                             Export JSON
                         </button>
 
-                        <label className="px-4 py-2 rounded-lg border-4 border-black dark:border-white/20 hover:bg-gray-100 dark:hover:bg-gray-800 transition text-sm cursor-pointer">
+                        <label className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition text-sm cursor-pointer">
                             Import JSON
                             <input
                                 type="file"
@@ -512,10 +632,11 @@ export default function GraphingPage() {
                         </label>
                     </div>
 
-                    <p className="text-xs text-gray-700 dark:text-gray-400">
+                    <p className="text-xs text-gray-400">
                         Save and load your custom chart configurations
                     </p>
                 </div>
+
             </div>
         </div>
     );
