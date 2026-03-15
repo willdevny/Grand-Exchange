@@ -2,11 +2,17 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+type ChatLink = {
+    label: string
+    href: string
+}
+
 type ChatMessage = {
     id: string
     role: 'user' | 'agent'
     content: string
     timestamp: number
+    links?: ChatLink[]
 }
 
 type NewsItem = {
@@ -103,13 +109,7 @@ export default function AgentPage() {
             let agentResponse = `Here is the current context I found for ${ticker}:\n\n`
 
             if (news.length > 0) {
-                agentResponse += 'Top news headlines:\n'
-                news.slice(0, 5).forEach((item, index) => {
-                    const title = item.title ?? 'Untitled article'
-                    const source = item.source ? ` (${item.source})` : ''
-                    agentResponse += `${index + 1}. ${title}${source}\n`
-                })
-                agentResponse += '\n'
+                agentResponse += `I found ${news.slice(0, 5).length} relevant news headline(s).\n\n`
             } else {
                 agentResponse += 'No recent Google News headlines were found.\n\n'
             }
@@ -132,11 +132,26 @@ export default function AgentPage() {
                 agentResponse += 'No Reddit sentiment data was available.\n'
             }
 
+            const newsLinks = news
+                .slice(0, 5)
+                .filter(
+                    (item): item is NewsItem & { title: string; link: string } =>
+                        typeof item.title === 'string' &&
+                        item.title.length > 0 &&
+                        typeof item.link === 'string' &&
+                        item.link.length > 0
+                )
+                .map((item) => ({
+                    label: item.source ? `${item.title} (${item.source})` : item.title,
+                    href: item.link,
+                }))
+
             const agentMsg: ChatMessage = {
                 id: crypto.randomUUID(),
                 role: 'agent',
                 content: agentResponse,
                 timestamp: Date.now(),
+                links: newsLinks,
             }
 
             setMessages((prev) => [...prev, agentMsg])
@@ -190,6 +205,7 @@ export default function AgentPage() {
                             key={msg.id}
                             role={msg.role}
                             content={msg.content}
+                            links={msg.links}
                         />
                     ))}
 
@@ -234,9 +250,11 @@ export default function AgentPage() {
 function MessageBubble({
                            role,
                            content,
+                           links,
                        }: {
     role: 'user' | 'agent'
     content: string
+    links?: ChatLink[]
 }) {
     const isUser = role === 'user'
 
@@ -251,7 +269,28 @@ function MessageBubble({
                 ].join(' ')}
             >
                 <div className="text-xs font-bold mb-1">{isUser ? 'You' : 'Agent'}</div>
+
                 <div className="whitespace-pre-wrap">{content}</div>
+
+                {!isUser && links && links.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                        <div className="text-xs font-semibold">Top news headlines:</div>
+                        <ul className="space-y-1">
+                            {links.map((link, index) => (
+                                <li key={`${link.href}-${index}`}>
+                                    <a
+                                        href={link.href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-blue-600 dark:text-blue-400 underline hover:opacity-80"
+                                    >
+                                        {index + 1}. {link.label}
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
             </div>
         </div>
     )
