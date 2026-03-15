@@ -1,35 +1,46 @@
-// app/api/agent/context/route.ts
-import { NextResponse } from "next/server";
-import { fetchGoogleNewsRSS } from "@/lib/news/googleNews";
-import { fetchRedditMentions } from "@/lib/reddit/redditClient";
-import { scoreSentiment } from "@/lib/sentiment/basicSentiment";
+import { NextResponse } from 'next/server'
+import { fetchGoogleNewsRSS } from '@/lib/news/googleNews'
+import { scoreNewsSentiment } from '@/lib/sentiment/newsSentiment'
+
+type RequestBody = {
+    query?: string
+}
+
+function extractTickerOrQuery(input: string): string {
+    const upperTicker = input.match(/\b[A-Z]{1,5}\b/)
+    if (upperTicker) return upperTicker[0]
+
+    return input.trim()
+}
 
 export async function POST(req: Request) {
-    const body = await req.json().catch(() => ({}));
-    const query = String(body?.query ?? "").trim();
+    try {
+        const body = (await req.json()) as RequestBody
+        const query = body.query?.trim()
 
-    if (!query) {
-        return NextResponse.json({ error: "Missing query" }, { status: 400 });
+        if (!query) {
+            return NextResponse.json(
+                { error: 'Missing query' },
+                { status: 400 }
+            )
+        }
+
+        const ticker = extractTickerOrQuery(query)
+
+        const news = await fetchGoogleNewsRSS(ticker, 5)
+        const newsSentiment = scoreNewsSentiment(news)
+
+        return NextResponse.json({
+            ticker,
+            news,
+            newsSentiment,
+        })
+    } catch (error) {
+        console.error('Agent context error:', error)
+
+        return NextResponse.json(
+            { error: 'Failed to fetch agent context' },
+            { status: 500 }
+        )
     }
-
-    // naive ticker extraction: can improve this later if needed
-    const tickerMatch = query.match(/\b[A-Z]{1,5}\b/);
-    const ticker = tickerMatch?.[0] ?? query;
-
-    const [news, reddit] = await Promise.all([
-        fetchGoogleNewsRSS(ticker, 5),
-        fetchRedditMentions(ticker, 25),
-    ]);
-
-    const redditTexts = reddit.map(r => r.text);
-    const redditSentiment = scoreSentiment(redditTexts);
-
-    return NextResponse.json({
-        ticker,
-        news,
-        reddit: {
-            mentions: reddit.slice(0, 10),
-            sentiment: redditSentiment,
-        },
-    });
 }

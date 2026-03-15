@@ -38,9 +38,20 @@ type RedditSentiment = {
     total?: number
 }
 
+type NewsSentiment = {
+    score?: number
+    positives?: number
+    negatives?: number
+    neutral?: number
+    total?: number
+    positiveKeywords?: number
+    negativeKeywords?: number
+}
+
 type AgentContextResponse = {
     ticker?: string
     news?: NewsItem[]
+    newsSentiment?: NewsSentiment
     reddit?: {
         mentions?: RedditMention[]
         sentiment?: RedditSentiment
@@ -101,6 +112,7 @@ export default function AgentPage() {
 
             const ticker = ctx.ticker ?? 'Unknown'
             const news = Array.isArray(ctx.news) ? ctx.news : []
+            const newsSentiment = ctx.newsSentiment
             const redditSentiment = ctx.reddit?.sentiment
             const redditMentions = Array.isArray(ctx.reddit?.mentions)
                 ? ctx.reddit.mentions
@@ -109,7 +121,22 @@ export default function AgentPage() {
             let agentResponse = `Here is the current context I found for ${ticker}:\n\n`
 
             if (news.length > 0) {
-                agentResponse += `I found ${news.slice(0, 5).length} relevant news headline(s).\n\n`
+                agentResponse += `I found ${news.slice(0, 5).length} relevant news headline(s).\n`
+
+                if (newsSentiment) {
+                    const score =
+                        typeof newsSentiment.score === 'number'
+                            ? newsSentiment.score.toFixed(2)
+                            : 'N/A'
+
+                    agentResponse += `Headline sentiment summary:\n`
+                    agentResponse += `- Score: ${score}\n`
+                    agentResponse += `- Positive headlines: ${newsSentiment.positives ?? 0}\n`
+                    agentResponse += `- Negative headlines: ${newsSentiment.negatives ?? 0}\n`
+                    agentResponse += `- Neutral headlines: ${newsSentiment.neutral ?? 0}\n`
+                    agentResponse += `- Positive keyword hits: ${newsSentiment.positiveKeywords ?? 0}\n`
+                    agentResponse += `- Negative keyword hits: ${newsSentiment.negativeKeywords ?? 0}\n\n`
+                }
             } else {
                 agentResponse += 'No recent Google News headlines were found.\n\n'
             }
@@ -142,7 +169,10 @@ export default function AgentPage() {
                         item.link.length > 0
                 )
                 .map((item) => ({
-                    label: item.source ? `${item.title} (${item.source})` : item.title,
+                    label:
+                        item.source && !item.title.includes(item.source)
+                            ? `${item.title} (${item.source})`
+                            : item.title,
                     href: item.link,
                 }))
 
