@@ -22,24 +22,6 @@ type NewsItem = {
     publishedAt?: string
 }
 
-type RedditMention = {
-    title?: string
-    text?: string
-    url?: string
-    subreddit?: string
-    createdUtc?: number
-}
-
-type RedditSentiment = {
-    score?: number
-    positives?: number
-    negatives?: number
-    neutral?: number
-    total?: number
-    positiveKeywords?: number
-    negativeKeywords?: number
-}
-
 type NewsSentiment = {
     score?: number
     positives?: number
@@ -54,10 +36,6 @@ type AgentContextResponse = {
     ticker?: string
     news?: NewsItem[]
     newsSentiment?: NewsSentiment
-    reddit?: {
-        mentions?: RedditMention[]
-        sentiment?: RedditSentiment
-    }
     error?: string
 }
 
@@ -115,10 +93,6 @@ export default function AgentPage() {
             const ticker = ctx.ticker ?? 'Unknown'
             const news = Array.isArray(ctx.news) ? ctx.news : []
             const newsSentiment = ctx.newsSentiment
-            const redditSentiment = ctx.reddit?.sentiment
-            const redditMentions = Array.isArray(ctx.reddit?.mentions)
-                ? ctx.reddit.mentions
-                : []
 
             let agentResponse = `Here is the current context I found for ${ticker}:\n\n`
 
@@ -141,24 +115,6 @@ export default function AgentPage() {
                 }
             } else {
                 agentResponse += 'No recent Google News headlines were found.\n\n'
-            }
-
-            if (redditSentiment && redditMentions.length > 0) {
-                const score =
-                    typeof redditSentiment.score === 'number'
-                        ? redditSentiment.score.toFixed(2)
-                        : 'N/A'
-
-                agentResponse += '\nReddit sentiment summary:\n'
-                agentResponse += `- Score: ${score}\n`
-                agentResponse += `- Positive posts: ${redditSentiment.positives ?? 0}\n`
-                agentResponse += `- Negative posts: ${redditSentiment.negatives ?? 0}\n`
-                agentResponse += `- Neutral posts: ${redditSentiment.neutral ?? 0}\n`
-                agentResponse += `- Total mentions analyzed: ${redditSentiment.total ?? redditMentions.length}\n`
-                agentResponse += `- Positive keyword hits: ${redditSentiment.positiveKeywords ?? 0}\n`
-                agentResponse += `- Negative keyword hits: ${redditSentiment.negativeKeywords ?? 0}\n`
-            } else {
-                agentResponse += '\nNo Reddit sentiment data was available.\n'
             }
 
             const newsLinks = news

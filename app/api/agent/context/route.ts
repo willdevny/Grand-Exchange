@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { fetchGoogleNewsRSS } from '@/lib/news/googleNews'
 import { scoreNewsSentiment } from '@/lib/sentiment/newsSentiment'
-import { fetchRedditMentions } from '@/lib/reddit/redditClient'
-import { scoreRedditSentiment } from '@/lib/sentiment/redditSentiment'
 
 type RequestBody = {
     query?: string
@@ -28,25 +26,13 @@ export async function POST(req: Request) {
 
         const ticker = extractTickerOrQuery(query)
 
-        const [news, redditMentions] = await Promise.all([
-            fetchGoogleNewsRSS(ticker, 5),
-            fetchRedditMentions(ticker, 10).catch((error) => {
-                console.error('Reddit fetch failed:', error)
-                return []
-            }),
-        ])
-
+        const news = await fetchGoogleNewsRSS(ticker, 5)
         const newsSentiment = scoreNewsSentiment(news)
-        const redditSentiment = scoreRedditSentiment(redditMentions)
 
         return NextResponse.json({
             ticker,
             news,
             newsSentiment,
-            reddit: {
-                mentions: redditMentions,
-                sentiment: redditSentiment,
-            },
         })
     } catch (error) {
         console.error('Agent context error:', error)
