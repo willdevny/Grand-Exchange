@@ -36,6 +36,8 @@ type RedditSentiment = {
     negatives?: number
     neutral?: number
     total?: number
+    positiveKeywords?: number
+    negativeKeywords?: number
 }
 
 type NewsSentiment = {
@@ -141,22 +143,22 @@ export default function AgentPage() {
                 agentResponse += 'No recent Google News headlines were found.\n\n'
             }
 
-            if (redditSentiment) {
+            if (redditSentiment && redditMentions.length > 0) {
                 const score =
                     typeof redditSentiment.score === 'number'
                         ? redditSentiment.score.toFixed(2)
                         : 'N/A'
 
-                agentResponse += 'Reddit sentiment summary:\n'
+                agentResponse += '\nReddit sentiment summary:\n'
                 agentResponse += `- Score: ${score}\n`
                 agentResponse += `- Positive posts: ${redditSentiment.positives ?? 0}\n`
                 agentResponse += `- Negative posts: ${redditSentiment.negatives ?? 0}\n`
                 agentResponse += `- Neutral posts: ${redditSentiment.neutral ?? 0}\n`
-                agentResponse += `- Total mentions analyzed: ${
-                    redditSentiment.total ?? redditMentions.length
-                }\n`
+                agentResponse += `- Total mentions analyzed: ${redditSentiment.total ?? redditMentions.length}\n`
+                agentResponse += `- Positive keyword hits: ${redditSentiment.positiveKeywords ?? 0}\n`
+                agentResponse += `- Negative keyword hits: ${redditSentiment.negativeKeywords ?? 0}\n`
             } else {
-                agentResponse += 'No Reddit sentiment data was available.\n'
+                agentResponse += '\nNo Reddit sentiment data was available.\n'
             }
 
             const newsLinks = news
