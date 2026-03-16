@@ -22,6 +22,22 @@ type NewsItem = {
     publishedAt?: string
 }
 
+type RedditMention = {
+    title?: string
+    text?: string
+    url?: string
+    subreddit?: string
+    createdUtc?: number
+}
+
+type RedditSentiment = {
+    score?: number
+    positives?: number
+    negatives?: number
+    neutral?: number
+    total?: number
+}
+
 type NewsSentiment = {
     score?: number
     positives?: number
@@ -32,11 +48,52 @@ type NewsSentiment = {
     negativeKeywords?: number
 }
 
+type PriceBar = {
+    date?: string
+    open?: number
+    high?: number
+    low?: number
+    close?: number
+    volume?: number
+}
+
+type IndicatorSnapshot = {
+    barsAnalyzed?: number
+    latestClose?: number | null
+    latestDate?: string | null
+    change1D?: number | null
+    return5D?: number | null
+    return20D?: number | null
+    sma20?: number | null
+    sma50?: number | null
+    ema12?: number | null
+    ema26?: number | null
+    rsi14?: number | null
+    macd?: number | null
+    macdSignal?: number | null
+    macdHistogram?: number | null
+    avgVolume20?: number | null
+    latestVolume?: number | null
+    volumeVsAvg20?: number | null
+}
+
 type AgentContextResponse = {
     ticker?: string
     news?: NewsItem[]
     newsSentiment?: NewsSentiment
+    historicalPrices?: PriceBar[]
+    indicators?: IndicatorSnapshot
+    reddit?: {
+        mentions?: RedditMention[]
+        sentiment?: RedditSentiment
+    }
     error?: string
+}
+
+function formatMetric(value: number | null | undefined, digits = 2) {
+    return typeof value === 'number' && Number.isFinite(value)
+        ? value.toFixed(digits)
+        : 'N/A'
 }
 
 export default function AgentPage() {
@@ -93,6 +150,14 @@ export default function AgentPage() {
             const ticker = ctx.ticker ?? 'Unknown'
             const news = Array.isArray(ctx.news) ? ctx.news : []
             const newsSentiment = ctx.newsSentiment
+            const redditSentiment = ctx.reddit?.sentiment
+            const redditMentions = Array.isArray(ctx.reddit?.mentions)
+                ? ctx.reddit.mentions
+                : []
+            const historicalPrices = Array.isArray(ctx.historicalPrices)
+                ? ctx.historicalPrices
+                : []
+            const indicators = ctx.indicators
 
             let agentResponse = `Here is the current context I found for ${ticker}:\n\n`
 
@@ -115,6 +180,46 @@ export default function AgentPage() {
                 }
             } else {
                 agentResponse += 'No recent Google News headlines were found.\n\n'
+            }
+
+            if (historicalPrices.length > 0 && indicators) {
+                agentResponse += 'Historical price data and indicators:\n'
+                agentResponse += `- Trading days analyzed: ${indicators.barsAnalyzed ?? historicalPrices.length}\n`
+                agentResponse += `- Latest close (${indicators.latestDate ?? 'most recent day'}): ${formatMetric(indicators.latestClose)}\n`
+                agentResponse += `- 1-day change: ${formatMetric(indicators.change1D)}%\n`
+                agentResponse += `- 5-day return: ${formatMetric(indicators.return5D)}%\n`
+                agentResponse += `- 20-day return: ${formatMetric(indicators.return20D)}%\n`
+                agentResponse += `- SMA 20: ${formatMetric(indicators.sma20)}\n`
+                agentResponse += `- SMA 50: ${formatMetric(indicators.sma50)}\n`
+                agentResponse += `- EMA 12: ${formatMetric(indicators.ema12)}\n`
+                agentResponse += `- EMA 26: ${formatMetric(indicators.ema26)}\n`
+                agentResponse += `- RSI 14: ${formatMetric(indicators.rsi14)}\n`
+                agentResponse += `- MACD: ${formatMetric(indicators.macd)}\n`
+                agentResponse += `- MACD signal: ${formatMetric(indicators.macdSignal)}\n`
+                agentResponse += `- MACD histogram: ${formatMetric(indicators.macdHistogram)}\n`
+                agentResponse += `- Latest volume: ${formatMetric(indicators.latestVolume, 0)}\n`
+                agentResponse += `- 20-day avg volume: ${formatMetric(indicators.avgVolume20, 0)}\n`
+                agentResponse += `- Volume vs avg(20): ${formatMetric(indicators.volumeVsAvg20)}x\n\n`
+            } else {
+                agentResponse += 'Historical stock data and indicators were not available.\n\n'
+            }
+
+            if (redditSentiment) {
+                const score =
+                    typeof redditSentiment.score === 'number'
+                        ? redditSentiment.score.toFixed(2)
+                        : 'N/A'
+
+                agentResponse += 'Reddit sentiment summary:\n'
+                agentResponse += `- Score: ${score}\n`
+                agentResponse += `- Positive posts: ${redditSentiment.positives ?? 0}\n`
+                agentResponse += `- Negative posts: ${redditSentiment.negatives ?? 0}\n`
+                agentResponse += `- Neutral posts: ${redditSentiment.neutral ?? 0}\n`
+                agentResponse += `- Total mentions analyzed: ${
+                    redditSentiment.total ?? redditMentions.length
+                }\n`
+            } else {
+                agentResponse += 'No Reddit sentiment data was available.\n'
             }
 
             const newsLinks = news
