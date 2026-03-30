@@ -37,7 +37,8 @@ export async function POST(req: Request) {
         const indicators = calculateIndicators(historicalPrices)
         const redditSentiment = loadDump(ticker)
         const socialPosts = (await fetchBlueskyPosts(ticker, 4)).slice(0, 4)
-        const socialSnapshot = socialPosts.length > 0 ? socialPosts : getDemoSocialPosts(ticker)
+        const socialSnapshot =
+            socialPosts.length > 0 ? socialPosts : getDemoSocialPosts(ticker)
 
         return NextResponse.json({
             ticker,

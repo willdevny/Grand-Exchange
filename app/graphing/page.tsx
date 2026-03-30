@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState} from "react";
 import * as d3 from "d3";
 
 //type used for stock representation
@@ -24,15 +24,41 @@ type DataPoint = {
     close: number;
 };
 
+type StockQuote = {
+    symbol: string;
+    price: number;
+    day_high: number;
+    day_low: number;
+    close: number;
+    volume: number;
+    previous_close?: number;
+};
+
+type CompanyInfo = {
+    name: string;
+    industry?: string;
+    sector?: string;
+    website?: string;
+};
+
 type Stock = {
     symbol: string;
     values: DataPoint[];
     color?: string;
+    quote?: StockQuote;
+    company?: CompanyInfo;
+};
+
+type StockFetchResult = {
+    values: DataPoint[];
+    quote?: StockQuote;
+    company?: CompanyInfo;
 };
 
 type ViewMode = "compare" | "single";
 
 function StockDetails({ stock }: { stock: Stock }) {
+
     if (!stock.values.length) return null;
 
     const latest = stock.values[stock.values.length - 1];
@@ -45,12 +71,35 @@ function StockDetails({ stock }: { stock: Stock }) {
     const low = Math.min(...stock.values.map(v => v.close));
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <DetailItem label="Latest Close" value={`$${latest.close.toFixed(2)}`} />
-            <DetailItem label="6M Change" value={`$${change.toFixed(2)}`} />
-            <DetailItem label="% Change" value={`${percentChange.toFixed(2)}%`} />
-            <DetailItem label="6M High" value={`$${high.toFixed(2)}`} />
-            <DetailItem label="6M Low" value={`$${low.toFixed(2)}`} />
+        <div className="space-y-6">
+
+            {/* Company Info */}
+            {stock.company && (
+                <div className="text-sm text-gray-600">
+                    <div className="font-semibold">{stock.company.name}</div>
+                    <div>{stock.company.industry}</div>
+                </div>
+            )}
+
+            {/* Quote Metrics */}
+            {stock.quote && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <DetailItem label="Current Price" value={`$${stock.quote.price}`} />
+                    <DetailItem label="Day High" value={`$${stock.quote.day_high}`} />
+                    <DetailItem label="Day Low" value={`$${stock.quote.day_low}`} />
+                    <DetailItem label="Volume" value={`${stock.quote.volume}`} />
+                </div>
+            )}
+
+            {/* Performance */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <DetailItem label="Latest Close" value={`$${latest.close.toFixed(2)}`} />
+                <DetailItem label="6M Change" value={`$${change.toFixed(2)}`} />
+                <DetailItem label="% Change" value={`${percentChange.toFixed(2)}%`} />
+                <DetailItem label="6M High" value={`$${high.toFixed(2)}`} />
+                <DetailItem label="6M Low" value={`$${low.toFixed(2)}`} />
+            </div>
+
         </div>
     );
 }
@@ -79,6 +128,8 @@ export default function GraphingPage() {
     const [viewMode, setViewMode] = useState<"compare" | "single">("compare");
     //stores specific stock for single viewmode
     const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+    //controls Average toggle
+    const [showAverage, setShowAverage] = useState(false);
 
     //chart margins
     const margin = { top: 20, right: 30, bottom: 40, left: 50 };
@@ -89,51 +140,60 @@ export default function GraphingPage() {
     //default color scale
     const colorScale = d3.scaleOrdinal<string, string>(d3.schemeCategory10);
 
+    const averageStock = showAverage
+        ? calculateAverageStock(stocks)
+        : null;
+
     // -----------------------
-    // Fetch stock data via server API (WORK IN PROGRESS)
+    // Fetch stock data via server API
     // -----------------------
     const MAX_API_DAYS = 182; // ~6 months
 
-    async function fetchStockData(symbol: string): Promise<DataPoint[]> {
+    async function fetchStockData(symbol: string): Promise<StockFetchResult | null> {
         try {
-            // determine actual request range
-
             const res = await fetch(`/api/stock/${symbol}?rangeDays=${MAX_API_DAYS}`);
 
             if (!res.ok) {
                 const text = await res.text();
                 console.error("API Error:", res.status, text);
-                return [];
+                return null;
             }
 
             const raw = await res.json();
+
             console.log("RAW RESPONSE FULL:", JSON.stringify(raw, null, 2));
 
             if (!raw.data || !Array.isArray(raw.data)) {
                 console.error("Unexpected API shape:", raw);
-                return [];
+                return null;
             }
 
-            // Parse dates as UTC
+            // Convert API history into DataPoint[]
             const data: DataPoint[] = raw.data.map((item: StockApiResponseItem) => ({
                 date: new Date(item.date),
                 close: Number(item.close),
             }));
 
-            // Sort oldest first
+            // Sort oldest → newest
             data.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-            // Slice to the client’s requested range (if user selected more than 6 months)
-            const cutoffDate = new Date(Date.now() - selectedRangeDays * 24 * 60 * 60 * 1000);
+            // Client range filtering
+            const cutoffDate = new Date(
+                Date.now() - selectedRangeDays * 24 * 60 * 60 * 1000
+            );
 
-            const slicedData = data.filter(d => d.date >= cutoffDate);
+            const slicedData = data.filter((d) => d.date >= cutoffDate);
 
             console.log(`Fetched ${slicedData.length} valid points for ${symbol}`);
 
-            return slicedData;
+            return {
+                values: slicedData,
+                quote: raw.quote ?? null,
+                company: raw.company ?? null,
+            };
         } catch (err) {
             console.error("Failed to fetch stock data:", err);
-            return [];
+            return null;
         }
     }
 
@@ -171,71 +231,82 @@ export default function GraphingPage() {
     // Add stock
     // -----------------------
     async function handleAddStock() {
-        const symbol = symbolInput.toUpperCase();
+        const symbol = symbolInput.toUpperCase().trim();
 
         if (!symbol) return;
 
-        const values = await fetchStockData(symbol);
-        if (values.length === 0) {
+        const result = await fetchStockData(symbol);
+
+        if (!result || result.values.length === 0) {
             setErrorMessage(`Could not fetch data for ${symbol}.`);
             return;
-        }
-        else{
-            setErrorMessage(null)
+        } else {
+            setErrorMessage(null);
         }
 
-        const newStock = { symbol, values, color: colorScale(symbol) };
+        const newStock: Stock = {
+            symbol,
+            values: result.values,
+            quote: result.quote,
+            company: result.company,
+            color: colorScale(symbol),
+        };
 
         if (viewMode === "single") {
             setSelectedStock(newStock);
-            setStocks([newStock]); // optional: clear others
+
+            setStocks((prev) => {
+                const exists = prev.find((s) => s.symbol === symbol);
+                if (exists) return prev;
+                return [...prev, newStock];
+            });
         } else {
             if (stocks.find((s) => s.symbol === symbol)) return;
-            setStocks([...stocks, newStock]);
+            setStocks((prev) => [...prev, newStock]);
         }
 
         setSymbolInput("");
     }
 
     function handleAddAverage() {
-        if (stocks.find((s) => s.symbol === "AVERAGE")) return;
-
-        const averageStock = calculateAverageStock(stocks);
-
-        if (!averageStock) return;
-
-        setStocks((prev) => [...prev, averageStock]);
+        setShowAverage(prev => !prev);
     }
-
 
     // -----------------------
     // Avg perfromance finder
     // -----------------------
 
     function calculateAverageStock(stocks: Stock[]): Stock | null {
-        if (stocks.length === 0) return null;
 
-        // Collect all unique dates across all stocks
+        const baseStocks = stocks.filter(s => s.symbol !== "AVERAGE");
+
+        if (baseStocks.length === 0) return null;
+
         const allDates = Array.from(
-            new Set(stocks.flatMap(s => s.values.map(v => v.date.getTime())))
+            new Set(baseStocks.flatMap(s => s.values.map(v => v.date.getTime())))
         )
-            .sort((a: number, b: number) => a - b)
+            .sort((a, b) => a - b)
             .map(t => new Date(t));
 
         const averagedValues: DataPoint[] = allDates.map(date => {
-            const values = stocks.map(
+
+            const values = baseStocks.map(
                 s => s.values.find(v => v.date.getTime() === date.getTime())?.close
             );
 
             const numericValues = values.map(v => v ?? 0);
-            const avg = numericValues.reduce((sum, v) => sum + v, 0) / stocks.length;
+
+            const avg =
+                numericValues.reduce((sum, v) => sum + v, 0) / baseStocks.length;
 
             return { date, close: avg };
         });
 
-        console.log("Calculated average stock with", averagedValues.length, "points");
-
-        return { symbol: "AVERAGE", values: averagedValues, color: "#000000" };
+        return {
+            symbol: "AVERAGE",
+            values: averagedValues,
+            color: "#000000",
+        };
     }
 
     // -----------------------
@@ -315,20 +386,26 @@ export default function GraphingPage() {
         event.target.value = "";
     }
 
-
     // -----------------------
     // Chart Rendering
     // -----------------------
-    // -----------------------
-// Chart Rendering
-// -----------------------
+
+    const activeStocks =
+        viewMode === "single" && selectedStock
+            ? [selectedStock]
+            : stocks;
+
+    const stocksToRender = averageStock
+        ? [...activeStocks, averageStock]
+        : activeStocks;
+
     useEffect(() => {
         if (!svgRef.current) return;
 
         const svg = d3.select(svgRef.current);
         svg.selectAll("*").remove(); // clear previous chart
 
-        if (stocks.length === 0) return;
+        if (stocksToRender.length === 0) return;
 
         const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -343,14 +420,14 @@ export default function GraphingPage() {
 
         const cutoffDate = new Date(Date.now() - selectedRangeDays * 24 * 60 * 60 * 1000);
 
-        const stocksToRender = stocks.map(stock => ({
+        const filteredStocks = stocksToRender.map(stock => ({
             ...stock,
             values: stock.values
                 .filter(v => v.date >= cutoffDate)
                 .filter(v => !isNaN(v.date.getTime())),
         }));
 
-        const allValues = stocksToRender.flatMap(s => s.values);
+        const allValues = filteredStocks.flatMap(s => s.values);
         if (allValues.length === 0) {
             console.warn("No valid data points to render chart.");
             return;
@@ -395,7 +472,7 @@ export default function GraphingPage() {
             .attr("stroke", "#e5e7eb");
 
         // ----- DRAW LINES -----
-        stocksToRender.forEach(stock => {
+        filteredStocks.forEach(stock => {
             if (stock.values.length === 0) {
                 console.warn(`Skipping ${stock.symbol}, no points to draw`);
                 return;
@@ -414,7 +491,7 @@ export default function GraphingPage() {
         });
 
         console.log("Chart rendered for stocks:", stocksToRender.map(s => s.symbol));
-    }, [stocks, selectedRangeDays]);
+    }, [stocksToRender, selectedRangeDays, viewMode]);
 
     // -----------------------
     // UI
@@ -442,7 +519,9 @@ export default function GraphingPage() {
                 {/*viewmode select card*/}
                 <div className="inline-flex rounded-lg bg-gray-100 p-1">
                     <button
-                        onClick={() => setViewMode("compare")}
+                        onClick={() => {
+                            setViewMode("compare");
+                        }}
                         className={`px-4 py-1 rounded-md text-sm font-medium transition ${
                             viewMode === "compare"
                                 ? "bg-white shadow text-black"
@@ -453,7 +532,13 @@ export default function GraphingPage() {
                     </button>
 
                     <button
-                        onClick={() => setViewMode("single")}
+                        onClick={() => {
+                            setViewMode("single");
+
+                            if (stocks.length > 0) {
+                                setSelectedStock(stocks[stocks.length - 1]);
+                            }
+                        }}
                         className={`px-4 py-1 rounded-md text-sm font-medium transition ${
                             viewMode === "single"
                                 ? "bg-white shadow text-black"
@@ -526,7 +611,7 @@ export default function GraphingPage() {
                             onClick={handleAddAverage}
                             className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition text-sm font-medium"
                         >
-                            Add Average
+                            Toggle Average
                         </button>
                     </div>
 
@@ -562,14 +647,16 @@ export default function GraphingPage() {
                                         className="w-5 h-5 p-0 border-0 cursor-pointer"
                                     />
 
-                                    <button
-                                        onClick={() =>
-                                            setStocks(stocks.filter((s) => s.symbol !== stock.symbol))
-                                        }
-                                        className="text-xs text-red-500 hover:text-red-700"
-                                    >
-                                        Remove
-                                    </button>
+                                    {stock.symbol !== "AVERAGE" && (
+                                        <button
+                                            onClick={() =>
+                                                setStocks(stocks.filter((s) => s.symbol !== stock.symbol))
+                                            }
+                                            className="text-xs text-red-500 hover:text-red-700"
+                                        >
+                                            Remove
+                                        </button>
+                                    )}
                                 </div>
                             ))}
                         </div>

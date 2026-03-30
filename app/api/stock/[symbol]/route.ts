@@ -11,10 +11,15 @@ function makeMockSeries(symbol: string, days: number) {
     date.setUTCDate(date.getUTCDate() - i)
     const day = date.getUTCDay()
     if (day === 0 || day === 6) continue
+
     const drift = Math.sin((days - i) / 8) * 1.8
     const noise = ((seed + i * 17) % 7) - 3
     price = Math.max(10, price + drift + noise * 0.35)
-    data.push({ date: date.toISOString().slice(0, 10), close: Number(price.toFixed(2)) })
+
+    data.push({
+      date: date.toISOString().slice(0, 10),
+      close: Number(price.toFixed(2)),
+    })
   }
 
   return data
@@ -29,7 +34,11 @@ export async function GET(
   const bars = await fetchHistoricalPrices(upper, 'D', 182)
 
   if (bars.length > 0) {
-    return NextResponse.json({ symbol: upper, source: 'finnhub', data: bars.map(({ date, close }) => ({ date, close })) })
+    return NextResponse.json({
+      symbol: upper,
+      source: 'finnhub',
+      data: bars.map(({ date, close }) => ({ date, close })),
+    })
   }
 
   return NextResponse.json({
