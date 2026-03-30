@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server'
-import { fetchGoogleNewsRSS } from '@/lib/news/googleNews'
-import { scoreNewsSentiment } from '@/lib/sentiment/newsSentiment'
+import {
+    enrichNewsWithArticleContent,
+    fetchGoogleNewsRSS,
+} from '@/lib/news/googleNews'
+import {
+    attachArticleSentiment,
+    scoreNewsSentiment,
+} from '@/lib/sentiment/newsSentiment'
 
 type RequestBody = {
     query?: string
 }
 
 function extractTickerOrQuery(input: string): string {
-    const upperTicker = input.match(/\b[A-Z]{1,5}\b/)
-    if (upperTicker) return upperTicker[0]
-    return input.trim()
+    const trimmed = input.trim()
+    const upper = trimmed.toUpperCase()
+    const match = upper.match(/\b[A-Z]{1,5}\b/)
+    return match ? match[0] : trimmed
 }
 
 async function fetchPythonMarketData(ticker: string) {
@@ -44,7 +51,7 @@ export async function POST(req: Request) {
 
         const ticker = extractTickerOrQuery(query)
 
-        const [news, marketData] = await Promise.all([
+        const [rawNews, marketData] = await Promise.all([
             fetchGoogleNewsRSS(ticker, 5).catch((error) => {
                 console.error('Google News fetch failed:', error)
                 return []
@@ -55,6 +62,8 @@ export async function POST(req: Request) {
             }),
         ])
 
+        const newsWithArticles = await enrichNewsWithArticleContent(rawNews)
+        const news = attachArticleSentiment(newsWithArticles)
         const newsSentiment = scoreNewsSentiment(news)
 
         return NextResponse.json({

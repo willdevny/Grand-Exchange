@@ -15,21 +15,39 @@ type ChatMessage = {
     links?: ChatLink[]
 }
 
+type ArticleSentimentDetails = {
+    score?: number
+    label?: 'positive' | 'negative' | 'neutral'
+    positiveKeywordHits?: number
+    negativeKeywordHits?: number
+    matchedPositiveKeywords?: string[]
+    matchedNegativeKeywords?: string[]
+    usedFullArticle?: boolean
+}
+
 type NewsItem = {
     title?: string
     source?: string
     link?: string
     publishedAt?: string
+    description?: string
+    articleUrl?: string
+    articleText?: string
+    articleTitle?: string
+    articleSentiment?: ArticleSentimentDetails
 }
 
 type NewsSentiment = {
     score?: number
+    keywordBalanceScore?: number
     positives?: number
     negatives?: number
     neutral?: number
     total?: number
     positiveKeywords?: number
     negativeKeywords?: number
+    articlesAnalyzed?: number
+    headlinesOnly?: number
 }
 
 type HistoricalPricePoint = {
@@ -114,7 +132,6 @@ export default function AgentPage() {
 
             let agentResponse = `Here is the current context I found for ${ticker}:\n\n`
 
-            //Historical Data section
             if (marketData) {
                 agentResponse += `Historical price + indicator summary:\n`
                 agentResponse += `- Latest close: ${
@@ -149,23 +166,30 @@ export default function AgentPage() {
 
             agentResponse += '\n'
 
-            //News section
             if (news.length > 0) {
-                agentResponse += `I found ${news.slice(0, 5).length} relevant news headline(s).\n`
+                agentResponse += `I found ${news.slice(0, 5).length} relevant news article(s).\n`
 
                 if (newsSentiment) {
-                    const score =
+                    const articleAverageScore =
                         typeof newsSentiment.score === 'number'
                             ? newsSentiment.score.toFixed(2)
                             : 'N/A'
 
-                    agentResponse += `Headline sentiment summary:\n`
-                    agentResponse += `- Score: ${score}\n`
-                    agentResponse += `- Positive headlines: ${newsSentiment.positives ?? 0}\n`
-                    agentResponse += `- Negative headlines: ${newsSentiment.negatives ?? 0}\n`
-                    agentResponse += `- Neutral headlines: ${newsSentiment.neutral ?? 0}\n`
+                    const keywordBalanceScore =
+                        typeof newsSentiment.keywordBalanceScore === 'number'
+                            ? newsSentiment.keywordBalanceScore.toFixed(2)
+                            : 'N/A'
+
+                    agentResponse += `News sentiment summary:\n`
+                    agentResponse += `- Article-average score: ${articleAverageScore}\n`
+                    agentResponse += `- Keyword-balance score: ${keywordBalanceScore}\n`
+                    agentResponse += `- Positive articles: ${newsSentiment.positives ?? 0}\n`
+                    agentResponse += `- Negative articles: ${newsSentiment.negatives ?? 0}\n`
+                    agentResponse += `- Neutral articles: ${newsSentiment.neutral ?? 0}\n`
                     agentResponse += `- Positive keyword hits: ${newsSentiment.positiveKeywords ?? 0}\n`
-                    agentResponse += `- Negative keyword hits: ${newsSentiment.negativeKeywords ?? 0}\n\n`
+                    agentResponse += `- Negative keyword hits: ${newsSentiment.negativeKeywords ?? 0}\n`
+                    agentResponse += `- Full articles analyzed: ${newsSentiment.articlesAnalyzed ?? 0}\n`
+                    agentResponse += `- Headline-only fallbacks: ${newsSentiment.headlinesOnly ?? 0}\n\n`
                 }
             } else {
                 agentResponse += 'No recent Google News headlines were found.\n\n'
@@ -180,13 +204,24 @@ export default function AgentPage() {
                         typeof item.link === 'string' &&
                         item.link.length > 0
                 )
-                .map((item) => ({
-                    label:
-                        item.source && !item.title.includes(item.source)
-                            ? `${item.title} (${item.source})`
-                            : item.title,
-                    href: item.link,
-                }))
+                .map((item) => {
+                    const sentimentLabel = item.articleSentiment?.label
+                        ? ` - ${item.articleSentiment.label}`
+                        : ''
+
+                    const extractionLabel =
+                        item.articleSentiment?.usedFullArticle === true
+                            ? ' [full article]'
+                            : ' [headline fallback]'
+
+                    return {
+                        label:
+                            item.source && !item.title.includes(item.source)
+                                ? `${item.title} (${item.source})${sentimentLabel}${extractionLabel}`
+                                : `${item.title}${sentimentLabel}${extractionLabel}`,
+                        href: item.articleUrl || item.link,
+                    }
+                })
 
             const agentMsg: ChatMessage = {
                 id: crypto.randomUUID(),
@@ -262,14 +297,14 @@ export default function AgentPage() {
                 </div>
 
                 <div className="flex gap-3 items-end">
-          <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Ask about a stock (e.g., 'Analyze AAPL sentiment and recent news')"
-              className="flex-1 min-h-[52px] max-h-[140px] resize-y bg-white dark:bg-gray-900 dark:text-white border-4 border-black dark:border-white/20 rounded-xl px-4 py-3 text-sm outline-none"
-              disabled={isLoading}
-          />
+                    <textarea
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Ask about a stock (e.g., 'Analyze AAPL sentiment and recent news')"
+                        className="flex-1 min-h-[52px] max-h-[140px] resize-y bg-white dark:bg-gray-900 dark:text-white border-4 border-black dark:border-white/20 rounded-xl px-4 py-3 text-sm outline-none"
+                        disabled={isLoading}
+                    />
 
                     <button
                         onClick={() => void sendMessage()}
