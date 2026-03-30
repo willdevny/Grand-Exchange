@@ -1,0 +1,41 @@
+{
+  "symbol": "TSLA",
+  "summary": { "positive": 48, "neutral": 18, "negative": 34 },
+  "posts": [
+    {
+      "id": "tsla-1",
+      "title": "TSLA still has upside if deliveries recover",
+      "subreddit": "stocks",
+      "author": "demo_bull_1",
+      "score": 188,
+      "comments": 112,
+      "createdAt": "2025-11-21T20:00:00.000Z",
+      "body": "Supporters think margins can improve again if volume stabilizes.",
+      "sentiment": "positive"
+    },
+    {
+      "id": "tsla-2",
+      "title": "Tesla sentiment feels split right now",
+      "subreddit": "investing",
+      "author": "demo_split_2",
+      "score": 120,
+      "comments": 73,
+      "createdAt": "2025-11-22T20:00:00.000Z",
+      "body": "The stock still gets a ton of attention, but people are divided on near-term growth.",
+      "sentiment": "neutral"
+    },
+    {
+      "id": "tsla-3",
+      "title": "TSLA looks overextended after the latest run",
+      "subreddit": "StockMarket",
+      "author": "demo_bear_3",
+      "score": 155,
+      "comments": 95,
+      "createdAt": "2025-11-23T20:00:00.000Z",
+      "body": "Bears are worried about valuation and execution risk.",
+      "sentiment": "negative"
+    }
+  ],
+  "source": "local-demo",
+  "generatedAt": "2025-11-23T22:00:00.000Z"
+}
