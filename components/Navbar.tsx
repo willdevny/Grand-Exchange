@@ -27,6 +27,7 @@ export default function Navbar() {
                 <NavButton href="/">Home</NavButton>
                 <NavButton href="/trending">Trending Stocks</NavButton>
                 <NavButton href="/twitter">X/Twitter Stocks</NavButton>
+                <NavButton href="/reddit">Reddit + Social</NavButton>
 
                 {/* Protected buttons */}
                 <ProtectedNavButton

@@ -34,6 +34,11 @@ export default function Home() {
                     title="Stock Agent (AI)"
                     description="Ask questions, analyze scenarios, and get AI-powered insights tailored to your investment goals."
                 />
+
+                <FeatureCard
+                    title="Reddit + Social Sentiment"
+                    description="Review simulated Reddit sentiment and a free social-source experiment for discussion signals around each ticker."
+                />
             </section>
         </div>
     )

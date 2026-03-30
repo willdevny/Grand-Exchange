@@ -1,0 +1,41 @@
+{
+  "symbol": "AAPL",
+  "summary": { "positive": 62, "neutral": 23, "negative": 15 },
+  "posts": [
+    {
+      "id": "aapl-1",
+      "title": "AAPL still looks strong into earnings",
+      "subreddit": "stocks",
+      "author": "demo_user_1",
+      "score": 213,
+      "comments": 87,
+      "createdAt": "2025-11-21T21:20:00.000Z",
+      "body": "I am bullish on Apple because services growth looks resilient and the balance sheet is strong.",
+      "sentiment": "positive"
+    },
+    {
+      "id": "aapl-2",
+      "title": "Is Apple overvalued right now?",
+      "subreddit": "investing",
+      "author": "demo_user_2",
+      "score": 144,
+      "comments": 59,
+      "createdAt": "2025-11-22T21:20:00.000Z",
+      "body": "Valuation is rich and some people are getting bearish after the recent rally.",
+      "sentiment": "negative"
+    },
+    {
+      "id": "aapl-3",
+      "title": "Apple feels like a steady long-term hold",
+      "subreddit": "StockMarket",
+      "author": "demo_user_3",
+      "score": 98,
+      "comments": 31,
+      "createdAt": "2025-11-23T18:10:00.000Z",
+      "body": "Not the flashiest stock, but a lot of investors still see it as dependable.",
+      "sentiment": "neutral"
+    }
+  ],
+  "source": "local-demo",
+  "generatedAt": "2025-11-23T22:00:00.000Z"
+}

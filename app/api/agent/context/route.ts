@@ -3,6 +3,8 @@ import { fetchGoogleNewsRSS } from '@/lib/news/googleNews'
 import { scoreNewsSentiment } from '@/lib/sentiment/newsSentiment'
 import { fetchHistoricalPrices } from '@/lib/market_historicalPrices'
 import { calculateIndicators } from '@/lib/market_indicators'
+import { loadDump } from '@/lib/reddit/redditDump'
+import { fetchBlueskyPosts, getDemoSocialPosts } from '@/lib/social/bluesky'
 
 type RequestBody = {
     query?: string
@@ -33,6 +35,9 @@ export async function POST(req: Request) {
         const newsSentiment = scoreNewsSentiment(news)
         const historicalPrices = await fetchHistoricalPrices(ticker, 'D', 90)
         const indicators = calculateIndicators(historicalPrices)
+        const redditSentiment = loadDump(ticker)
+        const socialPosts = (await fetchBlueskyPosts(ticker, 4)).slice(0, 4)
+        const socialSnapshot = socialPosts.length > 0 ? socialPosts : getDemoSocialPosts(ticker)
 
         return NextResponse.json({
             ticker,
@@ -40,6 +45,8 @@ export async function POST(req: Request) {
             newsSentiment,
             historicalPrices,
             indicators,
+            redditSentiment,
+            socialSnapshot,
         })
     } catch (error) {
         console.error('Agent context error:', error)

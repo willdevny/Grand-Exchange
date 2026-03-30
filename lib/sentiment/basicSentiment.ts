@@ -34,3 +34,9 @@ export function scoreSentiment(texts: string[]): SentimentSummary {
         total: texts.length,
     };
 }
+export function classifySentiment(text: string): 'positive' | 'neutral' | 'negative' {
+    const s = scoreSentiment([text]);
+    if (s.positives > s.negatives) return 'positive';
+    if (s.negatives > s.positives) return 'negative';
+    return 'neutral';
+}

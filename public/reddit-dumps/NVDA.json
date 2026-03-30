@@ -1,0 +1,41 @@
+{
+  "symbol": "NVDA",
+  "summary": { "positive": 71, "neutral": 17, "negative": 12 },
+  "posts": [
+    {
+      "id": "nvda-1",
+      "title": "NVDA still dominating AI demand",
+      "subreddit": "stocks",
+      "author": "demo_chip_1",
+      "score": 245,
+      "comments": 118,
+      "createdAt": "2025-11-21T19:30:00.000Z",
+      "body": "A lot of posters still think Nvidia is the name to beat in AI infrastructure.",
+      "sentiment": "positive"
+    },
+    {
+      "id": "nvda-2",
+      "title": "Nvidia is expensive, but momentum is real",
+      "subreddit": "investing",
+      "author": "demo_chip_2",
+      "score": 160,
+      "comments": 62,
+      "createdAt": "2025-11-22T19:30:00.000Z",
+      "body": "Some users are cautious, but they still respect how strong demand has been.",
+      "sentiment": "neutral"
+    },
+    {
+      "id": "nvda-3",
+      "title": "Any sign of slowing could hit NVDA hard",
+      "subreddit": "StockMarket",
+      "author": "demo_chip_3",
+      "score": 101,
+      "comments": 40,
+      "createdAt": "2025-11-23T19:30:00.000Z",
+      "body": "The bearish case is mostly about expectations getting too high.",
+      "sentiment": "negative"
+    }
+  ],
+  "source": "local-demo",
+  "generatedAt": "2025-11-23T22:00:00.000Z"
+}
