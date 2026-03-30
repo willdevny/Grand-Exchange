@@ -7,6 +7,8 @@ import {
     attachArticleSentiment,
     scoreNewsSentiment,
 } from '@/lib/sentiment/newsSentiment'
+import { fetchBlueskyAgentPosts } from '@/lib/social/blueskyAgent'
+import { analyzeBlueskySentiment } from '@/lib/sentiment/socialSentiment'
 
 type RequestBody = {
     query?: string
@@ -51,7 +53,7 @@ export async function POST(req: Request) {
 
         const ticker = extractTickerOrQuery(query)
 
-        const [rawNews, marketData] = await Promise.all([
+        const [rawNews, marketData, blueskyPosts] = await Promise.all([
             fetchGoogleNewsRSS(ticker, 5).catch((error) => {
                 console.error('Google News fetch failed:', error)
                 return []
@@ -60,16 +62,23 @@ export async function POST(req: Request) {
                 console.error('Python market fetch failed:', error)
                 return null
             }),
+            fetchBlueskyAgentPosts(ticker, 25).catch((error) => {
+                console.error('Bluesky agent fetch failed:', error)
+                return []
+            }),
         ])
 
         const newsWithArticles = await enrichNewsWithArticleContent(rawNews)
         const news = attachArticleSentiment(newsWithArticles)
         const newsSentiment = scoreNewsSentiment(news)
+        const socialSentiment = analyzeBlueskySentiment(blueskyPosts)
 
         return NextResponse.json({
             ticker,
             news,
             newsSentiment,
+            socialSentiment,
+            blueskyPosts,
             marketData,
         })
     } catch (error) {

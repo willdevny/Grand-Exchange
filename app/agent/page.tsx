@@ -25,6 +25,17 @@ type ArticleSentimentDetails = {
     usedFullArticle?: boolean
 }
 
+type SocialSentiment = {
+    score?: number
+    keywordBalanceScore?: number
+    positives?: number
+    negatives?: number
+    neutral?: number
+    total?: number
+    positiveKeywords?: number
+    negativeKeywords?: number
+}
+
 type NewsItem = {
     title?: string
     source?: string
@@ -70,6 +81,7 @@ type AgentContextResponse = {
     ticker?: string
     news?: NewsItem[]
     newsSentiment?: NewsSentiment
+    socialSentiment?: SocialSentiment
     marketData?: MarketData | null
     error?: string
 }
@@ -128,6 +140,7 @@ export default function AgentPage() {
             const ticker = ctx.ticker ?? 'Unknown'
             const news = Array.isArray(ctx.news) ? ctx.news : []
             const newsSentiment = ctx.newsSentiment
+            const socialSentiment = ctx.socialSentiment
             const marketData = ctx.marketData
 
             let agentResponse = `Here is the current context I found for ${ticker}:\n\n`
@@ -193,6 +206,28 @@ export default function AgentPage() {
                 }
             } else {
                 agentResponse += 'No recent Google News headlines were found.\n\n'
+            }
+
+            if (socialSentiment) {
+                const avg =
+                    typeof socialSentiment.score === 'number'
+                        ? socialSentiment.score.toFixed(2)
+                        : 'N/A'
+
+                const keyword =
+                    typeof socialSentiment.keywordBalanceScore === 'number'
+                        ? socialSentiment.keywordBalanceScore.toFixed(2)
+                        : 'N/A'
+
+                agentResponse += `Social sentiment (Bluesky):\n`
+                agentResponse += `- Post-average score: ${avg}\n`
+                agentResponse += `- Keyword-balance score: ${keyword}\n`
+                agentResponse += `- Positive posts: ${socialSentiment.positives ?? 0}\n`
+                agentResponse += `- Negative posts: ${socialSentiment.negatives ?? 0}\n`
+                agentResponse += `- Neutral posts: ${socialSentiment.neutral ?? 0}\n`
+                agentResponse += `- Positive keyword hits: ${socialSentiment.positiveKeywords ?? 0}\n`
+                agentResponse += `- Negative keyword hits: ${socialSentiment.negativeKeywords ?? 0}\n`
+                agentResponse += `- Total posts analyzed: ${socialSentiment.total ?? 0}\n\n`
             }
 
             const newsLinks = news
