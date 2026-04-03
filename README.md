@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Grand Exchange
 
-## Getting Started
+The Grand Exchange is Penn State Harrisburg Team 205's stock analysis and prediction capstone project. The current web application includes watchlist management, headline-based market context, stock graphing experiments, and an agent page that aggregates price data and sentiment.
 
-First, run the development server:
+## Team
+- Rashawn Sherman
+- Christian Lehman
+- William Devenney
+- Taquae Nelson
 
+## Repository
+GitHub: https://github.com/willdevny/Grand-Exchange
+
+## Tech Stack
+- Next.js 16 with the App Router
+- React 19 + TypeScript
+- Tailwind CSS 4
+- NextAuth for authentication
+- Python microservice for market analytics (optional local service)
+
+## Main Features
+- **Home page** introducing the project and navigation.
+- **Trending Stocks page** for stock discovery.
+- **X/Twitter Stocks page** for watchlist quotes and news headlines.
+- **Stock Graphing page** for protected graphing experiments.
+- **Stock Agent page** that aggregates market data and news sentiment.
+
+## Local Development
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+Open `http://localhost:3000` in your browser.
+
+## Environment Variables
+Create a `.env.local` file and provide the keys required by the routes you plan to exercise.
+
+Typical keys used by the current codebase:
+- `FINNHUB_API_KEY`
+- `FMP_API_KEY`
+- `NEWSAPI_KEY`
+- `PYTHON_MARKET_SERVICE_URL`
+
+## Testing
+This project is configured for Jest-based testing.
+
+### Install test dependencies
+```bash
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Run the test suite
+```bash
+npm test
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Run the test suite with coverage
+```bash
+npm run test:coverage
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Test scope
+The included test plan targets:
+- market indicator calculations
+- news sentiment scoring
+- basic sentiment classification
+- API aggregation behavior for the stock agent route
+- selected UI/component behavior for HelpPanel and dark-mode state
 
-## Learn More
+## API Documentation
+An OpenAPI document is included at `docs/openapi.yaml`.
 
-To learn more about Next.js, take a look at the following resources:
+Recommended workflow:
+1. Start the app locally.
+2. Open Swagger Editor or Swagger UI.
+3. Import `docs/openapi.yaml`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Project Structure
+```text
+app/                 Next.js routes and pages
+components/          Shared UI components
+lib/                 Data-fetching and sentiment/indicator logic
+python/              Local Python market service
+__tests__/           Jest unit and component tests
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Notes
+- The Python market service is optional during UI development; the agent route already falls back to `null` market data when the service is unavailable.
+- Some capstone requirements in the SRS are still planned rather than fully implemented, especially the ML prediction engine and the final LLM analysis layer.

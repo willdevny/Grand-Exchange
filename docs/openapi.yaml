@@ -1,0 +1,131 @@
+openapi: 3.0.3
+info:
+  title: The Grand Exchange API
+  version: 1.0.0
+  description: |
+    Internal API documentation for Team 205's capstone project. The API currently
+    exposes a stock-agent aggregation endpoint and a market/news endpoint used by
+    the X/Twitter Stocks page.
+servers:
+  - url: http://localhost:3000
+paths:
+  /api/agent/context:
+    post:
+      summary: Build stock analysis context for the agent page.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                  example: AAPL
+      responses:
+        '200':
+          description: Aggregated context payload for the agent page.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ticker:
+                    type: string
+                  news:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        title:
+                          type: string
+                        link:
+                          type: string
+                        source:
+                          type: string
+                        publishedAt:
+                          type: string
+                          format: date-time
+                        description:
+                          type: string
+                  newsSentiment:
+                    type: object
+                    properties:
+                      score:
+                        type: number
+                      positives:
+                        type: integer
+                      negatives:
+                        type: integer
+                      neutral:
+                        type: integer
+                      total:
+                        type: integer
+                      positiveKeywords:
+                        type: integer
+                      negativeKeywords:
+                        type: integer
+                  marketData:
+                    nullable: true
+                    type: object
+                    additionalProperties: true
+        '400':
+          description: Missing query.
+        '500':
+          description: Internal aggregation failure.
+  /api/twitter:
+    get:
+      summary: Return live stock quotes and headlines for the watchlist page.
+      parameters:
+        - in: query
+          name: symbols
+          schema:
+            type: string
+          description: Comma-separated list of ticker symbols.
+          example: AAPL,TSLA,NVDA
+        - in: query
+          name: newsSymbol
+          schema:
+            type: string
+          description: Symbol used when requesting news headlines.
+          example: AAPL
+      responses:
+        '200':
+          description: Quotes and news for the selected watchlist.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quotes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        symbol:
+                          type: string
+                        price:
+                          type: number
+                          nullable: true
+                        changePercent:
+                          type: number
+                          nullable: true
+                  news:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        headline:
+                          type: string
+                        url:
+                          type: string
+                        source:
+                          type: string
+                        publishedAt:
+                          type: string
+                          format: date-time
+        '500':
+          description: Missing API credentials.
+        '502':
+          description: Upstream News API failure.
