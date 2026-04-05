@@ -36,8 +36,8 @@ export default function Home() {
                 />
 
                 <FeatureCard
-                    title="Reddit + Social Sentiment"
-                    description="Review simulated Reddit sentiment and a free social-source experiment for discussion signals around each ticker."
+                    title="Youtube"
+                    description="Review simulated Youtube sentiment for discussion signals around each ticker."
                 />
             </section>
         </div>

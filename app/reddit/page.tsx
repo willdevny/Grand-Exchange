@@ -8,25 +8,17 @@ type SentimentSummary = {
   negative: number
 }
 
-type RedditPost = {
+type YouTubeComment = {
   id: string
-  title: string
-  subreddit: string
+  videoId: string
+  videoTitle: string
+  channelTitle: string
   author: string
-  score: number
-  comments: number
+  likes: number
   createdAt: string
-  body?: string
-  sentiment?: 'positive' | 'neutral' | 'negative'
-}
-
-type SocialPost = {
-  id: string
-  source: 'bluesky' | 'mastodon' | 'demo'
-  author: string
   text: string
-  createdAt?: string
   sentiment?: 'positive' | 'neutral' | 'negative'
+  url: string
 }
 
 function formatDate(value?: string) {
@@ -50,48 +42,66 @@ function SentimentBar({ label, value, tone }: { label: string; value: number; to
   )
 }
 
-function SourceBadge({ source }: { source: string }) {
-  const label = source === 'bluesky' ? 'Bluesky' : source === 'demo' ? 'Demo social' : source
-  return <span className="px-2 py-1 rounded-full text-xs font-bold border border-black/20 dark:border-white/20">{label}</span>
+function SentimentChart({ summary }: { summary: SentimentSummary }) {
+  const positiveHeight = Math.max(12, summary.positive)
+  const negativeHeight = Math.max(12, summary.negative)
+
+  return (
+    <div className="rounded-2xl border border-black/15 dark:border-white/15 p-4 space-y-4">
+      <div>
+        <h3 className="text-lg font-extrabold">Sentiment Chart</h3>
+        <p className="text-sm text-gray-700 dark:text-gray-300">Positive vs. negative YouTube comment sentiment for the selected ticker.</p>
+      </div>
+
+      <div className="flex items-end justify-center gap-8 h-52">
+        <div className="flex flex-col items-center gap-3 w-28">
+          <div className="text-sm font-bold">{summary.positive}%</div>
+          <div className="w-16 rounded-t-2xl bg-emerald-500" style={{ height: `${positiveHeight * 1.4}px` }} />
+          <div className="text-sm font-semibold">Positive</div>
+        </div>
+        <div className="flex flex-col items-center gap-3 w-28">
+          <div className="text-sm font-bold">{summary.negative}%</div>
+          <div className="w-16 rounded-t-2xl bg-rose-500" style={{ height: `${negativeHeight * 1.4}px` }} />
+          <div className="text-sm font-semibold">Negative</div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default function RedditPage() {
   const [symbolInput, setSymbolInput] = useState('AAPL')
   const [symbol, setSymbol] = useState('AAPL')
   const [summary, setSummary] = useState<SentimentSummary | null>(null)
-  const [posts, setPosts] = useState<RedditPost[]>([])
-  const [socialPosts, setSocialPosts] = useState<SocialPost[]>([])
-  const [redditBanner, setRedditBanner] = useState('')
-  const [socialBanner, setSocialBanner] = useState('')
+  const [comments, setComments] = useState<YouTubeComment[]>([])
+  const [youtubeBanner, setYouTubeBanner] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const totalPosts = useMemo(() => posts.length + socialPosts.length, [posts.length, socialPosts.length])
+  const positiveCount = useMemo(
+    () => comments.filter((item) => item.sentiment === 'positive').length,
+    [comments],
+  )
+  const negativeCount = useMemo(
+    () => comments.filter((item) => item.sentiment === 'negative').length,
+    [comments],
+  )
 
   async function loadData(nextSymbol: string) {
     setLoading(true)
     setError(null)
     try {
-      const [redditRes, socialRes] = await Promise.all([
-        fetch(`/api/reddit?symbol=${encodeURIComponent(nextSymbol)}`),
-        fetch(`/api/social?symbol=${encodeURIComponent(nextSymbol)}`),
-      ])
+      const youtubeRes = await fetch(`/api/reddit?symbol=${encodeURIComponent(nextSymbol)}`)
+      if (!youtubeRes.ok) throw new Error(`YouTube sentiment failed (${youtubeRes.status})`)
 
-      if (!redditRes.ok) throw new Error(`Reddit sentiment failed (${redditRes.status})`)
-      if (!socialRes.ok) throw new Error(`Social sentiment failed (${socialRes.status})`)
-
-      const redditData = await redditRes.json()
-      const socialData = await socialRes.json()
-
-      setSummary(redditData.summary)
-      setPosts(redditData.posts ?? [])
-      setSocialPosts(socialData.posts ?? [])
-      setRedditBanner(redditData.banner ?? '')
-      setSocialBanner(socialData.banner ?? '')
+      const youtubeData = await youtubeRes.json()
+      setSummary(youtubeData.summary)
+      setComments(youtubeData.posts ?? [])
+      setYouTubeBanner(youtubeData.banner ?? '')
       setSymbol(nextSymbol)
     } catch (e) {
       console.error(e)
-      setError('Could not load sentiment data right now.')
+      setError('Could not load YouTube sentiment data right now.')
     } finally {
       setLoading(false)
     }
@@ -112,9 +122,9 @@ export default function RedditPage() {
       <section className="card p-8 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-end gap-4 justify-between">
           <div>
-            <h1 className="text-4xl font-extrabold">Reddit + Social Sentiment</h1>
+            <h1 className="text-4xl font-extrabold">YouTube Sentiment</h1>
             <p className="text-lg text-gray-700 dark:text-gray-300 mt-2">
-              Demo sentiment for <span className="font-bold underline">{symbol}</span>, with a free social-source experiment added on top.
+              Live YouTube comment sentiment for <span className="font-bold underline">{symbol}</span>, using the YouTube API when available.
             </p>
           </div>
           <div className="flex gap-3 w-full lg:w-auto">
@@ -135,14 +145,9 @@ export default function RedditPage() {
           </div>
         </div>
 
-        {redditBanner && (
-          <div className="p-3 rounded-xl border border-amber-400 bg-amber-50 text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
-            {redditBanner}
-          </div>
-        )}
-        {socialBanner && (
+        {youtubeBanner && (
           <div className="p-3 rounded-xl border border-sky-400 bg-sky-50 text-sky-900 dark:bg-sky-950/20 dark:text-sky-200">
-            {socialBanner}
+            {youtubeBanner}
           </div>
         )}
         {error && (
@@ -155,7 +160,7 @@ export default function RedditPage() {
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="card p-6 space-y-4">
           <h2 className="text-2xl font-extrabold">Sentiment Snapshot</h2>
-          <p className="text-sm text-gray-700 dark:text-gray-300">Based on local Reddit demo posts for consistent capstone demos.</p>
+          <p className="text-sm text-gray-700 dark:text-gray-300">Built from YouTube comments returned for videos related to the selected stock symbol.</p>
           {summary && (
             <div className="space-y-4">
               <SentimentBar label="Positive" value={summary.positive} tone="bg-emerald-500" />
@@ -165,65 +170,54 @@ export default function RedditPage() {
           )}
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div className="rounded-xl border border-black/15 dark:border-white/15 p-4">
-              <div className="text-xs uppercase tracking-wide text-gray-500">Reddit posts</div>
-              <div className="text-2xl font-extrabold">{posts.length}</div>
+              <div className="text-xs uppercase tracking-wide text-gray-500">Comments analyzed</div>
+              <div className="text-2xl font-extrabold">{comments.length}</div>
             </div>
             <div className="rounded-xl border border-black/15 dark:border-white/15 p-4">
-              <div className="text-xs uppercase tracking-wide text-gray-500">Total social items</div>
-              <div className="text-2xl font-extrabold">{totalPosts}</div>
+              <div className="text-xs uppercase tracking-wide text-gray-500">Positive / Negative</div>
+              <div className="text-2xl font-extrabold">{positiveCount} / {negativeCount}</div>
             </div>
           </div>
         </div>
 
-        <div className="card p-6 lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-extrabold">What people are saying about {symbol}</h2>
-            <SourceBadge source="demo" />
-          </div>
-          <div className="space-y-4">
-            {posts.map((post) => (
-              <article key={post.id} className="rounded-2xl border border-black/15 dark:border-white/15 p-5 space-y-2">
-                <div className="flex items-start justify-between gap-3">
-                  <h3 className="text-2xl font-extrabold leading-tight">{post.title}</h3>
-                  <span className="text-xs uppercase font-bold rounded-full px-3 py-1 border border-black/15 dark:border-white/15">
-                    {post.sentiment ?? 'neutral'}
-                  </span>
-                </div>
-                <div className="text-sm text-gray-700 dark:text-gray-300">
-                  r/{post.subreddit} • u/{post.author} • score {post.score} • {post.comments} comments • {formatDate(post.createdAt)}
-                </div>
-                {post.body && <p className="text-base text-gray-800 dark:text-gray-200">{post.body}</p>}
-              </article>
-            ))}
-          </div>
+        <div className="card p-6 lg:col-span-2">
+          {summary ? <SentimentChart summary={summary} /> : null}
         </div>
       </section>
 
       <section className="card p-6 space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h2 className="text-2xl font-extrabold">Free social-source experiment</h2>
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              This section tries a free public social source first, then falls back to demo posts so the page still works.
-            </p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <SourceBadge source={socialPosts[0]?.source ?? 'demo'} />
-          </div>
+        <div>
+          <h2 className="text-2xl font-extrabold">What YouTube commenters are saying about {symbol}</h2>
+          <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+            Top-level comments are grouped from a few related videos and labeled with simple positive, neutral, or negative sentiment.
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {socialPosts.map((post) => (
-            <article key={post.id} className="rounded-2xl border border-black/15 dark:border-white/15 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <SourceBadge source={post.source} />
-                <span className="text-xs uppercase font-bold rounded-full px-2 py-1 border border-black/15 dark:border-white/15">
-                  {post.sentiment ?? 'neutral'}
+        <div className="space-y-4">
+          {comments.map((comment) => (
+            <article key={comment.id} className="rounded-2xl border border-black/15 dark:border-white/15 p-5 space-y-2">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <a
+                    href={comment.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-2xl font-extrabold leading-tight hover:underline"
+                  >
+                    {comment.videoTitle}
+                  </a>
+                  <div className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                    {comment.channelTitle} • {formatDate(comment.createdAt)}
+                  </div>
+                </div>
+                <span className="text-xs uppercase font-bold rounded-full px-3 py-1 border border-black/15 dark:border-white/15">
+                  {comment.sentiment ?? 'neutral'}
                 </span>
               </div>
-              <div className="font-bold">@{post.author}</div>
-              <p className="text-sm text-gray-800 dark:text-gray-200">{post.text}</p>
-              <div className="text-xs text-gray-500">{formatDate(post.createdAt)}</div>
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                @{comment.author} • {comment.likes} likes
+              </div>
+              <p className="text-base text-gray-800 dark:text-gray-200">{comment.text}</p>
             </article>
           ))}
         </div>
