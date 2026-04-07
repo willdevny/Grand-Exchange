@@ -96,8 +96,6 @@ export default function Navbar() {
                             </label>
 
                             {/* OTHER SETTINGS */}
-                            <Setting label="Show Tooltips" defaultChecked />
-                            <Setting label="Experimental AI" />
                         </div>
                     )}
                 </div>

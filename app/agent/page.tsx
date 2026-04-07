@@ -25,17 +25,6 @@ type ArticleSentimentDetails = {
     usedFullArticle?: boolean
 }
 
-type SocialSentiment = {
-    score?: number
-    keywordBalanceScore?: number
-    positives?: number
-    negatives?: number
-    neutral?: number
-    total?: number
-    positiveKeywords?: number
-    negativeKeywords?: number
-}
-
 type NewsItem = {
     title?: string
     source?: string
@@ -61,6 +50,17 @@ type NewsSentiment = {
     headlinesOnly?: number
 }
 
+type SocialSentiment = {
+    score?: number
+    keywordBalanceScore?: number
+    positives?: number
+    negatives?: number
+    neutral?: number
+    total?: number
+    positiveKeywords?: number
+    negativeKeywords?: number
+}
+
 type HistoricalPricePoint = {
     date: string
     close: number
@@ -79,6 +79,10 @@ type MarketData = {
 
 type AgentContextResponse = {
     ticker?: string
+    companyName?: string
+    displayName?: string
+    searchQuery?: string
+    matchedBy?: 'ticker' | 'company' | 'fallback'
     news?: NewsItem[]
     newsSentiment?: NewsSentiment
     socialSentiment?: SocialSentiment
@@ -86,19 +90,50 @@ type AgentContextResponse = {
     error?: string
 }
 
+const STORAGE_KEY = 'grand-exchange-agent-history'
+
+const DEFAULT_WELCOME_MESSAGE: ChatMessage = {
+    id: 'welcome',
+    role: 'agent',
+    content:
+        'Welcome to the Stock Agent. Enter a stock ticker or company name to generate a structured stock analysis summary. This tool is designed for stock lookup and report generation rather than freeform chat.',
+    timestamp: 0,
+}
+
 export default function AgentPage() {
-    const [messages, setMessages] = useState<ChatMessage[]>([
-        {
-            id: 'welcome',
-            role: 'agent',
-            content:
-                "Welcome to the Stock Agent. Ask me about a stock ticker or company name, and I'll pull together supporting context.",
-            timestamp: 0,
-        },
-    ])
+    const [messages, setMessages] = useState<ChatMessage[]>([DEFAULT_WELCOME_MESSAGE])
     const [input, setInput] = useState('')
     const [isLoading, setIsLoading] = useState(false)
+    const [hasLoadedHistory, setHasLoadedHistory] = useState(false)
     const logRef = useRef<HTMLDivElement | null>(null)
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY)
+
+            if (saved) {
+                const parsed = JSON.parse(saved) as ChatMessage[]
+
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setMessages(parsed)
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load agent history:', error)
+        } finally {
+            setHasLoadedHistory(true)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!hasLoadedHistory) return
+
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(messages))
+        } catch (error) {
+            console.error('Failed to save agent history:', error)
+        }
+    }, [messages, hasLoadedHistory])
 
     useEffect(() => {
         logRef.current?.scrollTo({
@@ -138,12 +173,22 @@ export default function AgentPage() {
             const ctx: AgentContextResponse = await res.json()
 
             const ticker = ctx.ticker ?? 'Unknown'
+            const companyName = ctx.companyName
+            const displayName = ctx.displayName ?? ticker
+            const matchedBy = ctx.matchedBy ?? 'fallback'
             const news = Array.isArray(ctx.news) ? ctx.news : []
             const newsSentiment = ctx.newsSentiment
             const socialSentiment = ctx.socialSentiment
             const marketData = ctx.marketData
 
-            let agentResponse = `Here is the current context I found for ${ticker}:\n\n`
+            let agentResponse = `Here is the current context I found for ${displayName}:\n\n`
+
+            if (companyName && companyName !== ticker) {
+                agentResponse += `Normalized input:\n`
+                agentResponse += `- Resolved company: ${companyName}\n`
+                agentResponse += `- Resolved ticker: ${ticker}\n`
+                agentResponse += `- Match type: ${matchedBy}\n\n`
+            }
 
             if (marketData) {
                 agentResponse += `Historical price + indicator summary:\n`
@@ -284,6 +329,56 @@ export default function AgentPage() {
         }
     }
 
+    function clearHistory() {
+        const resetMessages = [DEFAULT_WELCOME_MESSAGE]
+        setMessages(resetMessages)
+
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(resetMessages))
+        } catch (error) {
+            console.error('Failed to clear agent history:', error)
+        }
+    }
+
+    function exportHistory() {
+        try {
+            const lines: string[] = [
+                'The Grand Exchange - Stock Agent History',
+                '',
+            ]
+
+            for (const message of messages) {
+                const label = message.role === 'user' ? 'User' : 'Agent'
+                lines.push(`[${label}]`)
+                lines.push(message.content)
+                lines.push('')
+
+                if (message.links && message.links.length > 0) {
+                    lines.push('Links:')
+                    for (const link of message.links) {
+                        lines.push(`- ${link.label}: ${link.href}`)
+                    }
+                    lines.push('')
+                }
+            }
+
+            const content = lines.join('\n')
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+
+            const anchor = document.createElement('a')
+            anchor.href = url
+            anchor.download = 'stock-agent-history.txt'
+            document.body.appendChild(anchor)
+            anchor.click()
+            document.body.removeChild(anchor)
+
+            URL.revokeObjectURL(url)
+        } catch (error) {
+            console.error('Failed to export agent history:', error)
+        }
+    }
+
     function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -297,17 +392,37 @@ export default function AgentPage() {
                 <h1 className="text-4xl font-extrabold mb-4">Stock Agent</h1>
 
                 <p className="text-lg mb-2 text-gray-700 dark:text-gray-300">
-                    Ask our customized agent questions about stocks you may be interested
-                    in.
+                    Enter a stock ticker or company name to generate a structured stock
+                    analysis report.
                 </p>
 
                 <p className="text-sm text-gray-700 dark:text-gray-400">
-                    The agent can be extended to combine market news, Reddit sentiment,
-                    and other research signals.
+                    The Stock Agent gathers market indicators, recent news sentiment, and
+                    public social sentiment to prepare a report-ready summary for the
+                    selected stock. Then the data is used to generate an AI powered
+                    stock analysis report and prediction.
                 </p>
             </section>
 
             <section className="card p-6 space-y-4">
+                <div className="flex flex-wrap gap-3">
+                    <button
+                        onClick={clearHistory}
+                        disabled={isLoading}
+                        className="bg-white dark:bg-gray-900 dark:text-white border-4 border-black dark:border-white/20 rounded-xl px-4 py-2 font-semibold hover:bg-gray-200 dark:hover:bg-gray-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        Clear History
+                    </button>
+
+                    <button
+                        onClick={exportHistory}
+                        disabled={isLoading || messages.length === 0}
+                        className="bg-white dark:bg-gray-900 dark:text-white border-4 border-black dark:border-white/20 rounded-xl px-4 py-2 font-semibold hover:bg-gray-200 dark:hover:bg-gray-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        Export Log
+                    </button>
+                </div>
+
                 <div
                     ref={logRef}
                     className="h-[420px] overflow-y-auto rounded-xl border-4 border-black dark:border-white/20 bg-white dark:bg-gray-950 p-4 space-y-3"
@@ -325,7 +440,7 @@ export default function AgentPage() {
                         <div className="flex justify-start">
                             <div className="max-w-[80%] rounded-xl border-4 border-black dark:border-white/20 px-4 py-3 text-sm bg-gray-100 dark:bg-gray-900">
                                 <div className="text-xs font-bold mb-1">Agent</div>
-                                <div>Thinking...</div>
+                                <div>Generating stock analysis summary...</div>
                             </div>
                         </div>
                     )}
@@ -336,7 +451,7 @@ export default function AgentPage() {
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
-                        placeholder="Ask about a stock (e.g., 'Analyze AAPL sentiment and recent news')"
+                        placeholder="Enter a ticker or company name (e.g., AAPL, Apple, NVDA, Tesla)"
                         className="flex-1 min-h-[52px] max-h-[140px] resize-y bg-white dark:bg-gray-900 dark:text-white border-4 border-black dark:border-white/20 rounded-xl px-4 py-3 text-sm outline-none"
                         disabled={isLoading}
                     />

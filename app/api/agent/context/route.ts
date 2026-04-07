@@ -9,16 +9,10 @@ import {
 } from '@/lib/sentiment/newsSentiment'
 import { fetchBlueskyAgentPosts } from '@/lib/social/blueskyAgent'
 import { analyzeBlueskySentiment } from '@/lib/sentiment/socialSentiment'
+import { resolveStockInput } from '@/lib/stocks/resolveStockInput'
 
 type RequestBody = {
     query?: string
-}
-
-function extractTickerOrQuery(input: string): string {
-    const trimmed = input.trim()
-    const upper = trimmed.toUpperCase()
-    const match = upper.match(/\b[A-Z]{1,5}\b/)
-    return match ? match[0] : trimmed
 }
 
 async function fetchPythonMarketData(ticker: string) {
@@ -51,18 +45,18 @@ export async function POST(req: Request) {
             )
         }
 
-        const ticker = extractTickerOrQuery(query)
+        const resolved = resolveStockInput(query)
 
         const [rawNews, marketData, blueskyPosts] = await Promise.all([
-            fetchGoogleNewsRSS(ticker, 5).catch((error) => {
+            fetchGoogleNewsRSS(resolved.searchQuery, 5).catch((error) => {
                 console.error('Google News fetch failed:', error)
                 return []
             }),
-            fetchPythonMarketData(ticker).catch((error) => {
+            fetchPythonMarketData(resolved.ticker).catch((error) => {
                 console.error('Python market fetch failed:', error)
                 return null
             }),
-            fetchBlueskyAgentPosts(ticker, 25).catch((error) => {
+            fetchBlueskyAgentPosts(resolved.searchQuery, 25).catch((error) => {
                 console.error('Bluesky agent fetch failed:', error)
                 return []
             }),
@@ -74,7 +68,11 @@ export async function POST(req: Request) {
         const socialSentiment = analyzeBlueskySentiment(blueskyPosts)
 
         return NextResponse.json({
-            ticker,
+            ticker: resolved.ticker,
+            companyName: resolved.companyName,
+            displayName: resolved.displayName,
+            searchQuery: resolved.searchQuery,
+            matchedBy: resolved.matchedBy,
             news,
             newsSentiment,
             socialSentiment,
