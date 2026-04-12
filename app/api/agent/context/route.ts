@@ -10,6 +10,7 @@ import {
 import { fetchBlueskyAgentPosts } from '@/lib/social/blueskyAgent'
 import { analyzeBlueskySentiment } from '@/lib/sentiment/socialSentiment'
 import { resolveStockInput } from '@/lib/stocks/resolveStockInput'
+import { generateStockReport } from '@/lib/llm/generateStockReport'
 
 type RequestBody = {
     query?: string
@@ -67,6 +68,20 @@ export async function POST(req: Request) {
         const newsSentiment = scoreNewsSentiment(news)
         const socialSentiment = analyzeBlueskySentiment(blueskyPosts)
 
+        const stockReport = await generateStockReport({
+            ticker: resolved.ticker,
+            companyName: resolved.companyName,
+            displayName: resolved.displayName,
+            matchedBy: resolved.matchedBy,
+            marketData,
+            newsSentiment,
+            socialSentiment,
+            news,
+        }).catch((error) => {
+            console.error('OpenAI stock report generation failed:', error)
+            return null
+        })
+
         return NextResponse.json({
             ticker: resolved.ticker,
             companyName: resolved.companyName,
@@ -78,6 +93,7 @@ export async function POST(req: Request) {
             socialSentiment,
             blueskyPosts,
             marketData,
+            stockReport,
         })
     } catch (error) {
         console.error('Agent context error:', error)

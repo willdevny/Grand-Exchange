@@ -26,7 +26,7 @@ export default function Navbar() {
             <div className="flex gap-3 items-center">
                 <NavButton href="/">Home</NavButton>
                 <NavButton href="/trending">Trending Stocks</NavButton>
-                <NavButton href="/twitter">X/Twitter Stocks</NavButton>
+                <NavButton href="/twitter">Stock Tracking</NavButton>
                 <NavButton href="/reddit">Youtube</NavButton>
 
                 {/* Protected buttons */}

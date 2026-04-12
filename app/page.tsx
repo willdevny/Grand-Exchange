@@ -26,19 +26,27 @@ export default function Home() {
                 />
 
                 <FeatureCard
+                    title="Stock Tracking"
+                    description="Track personalized stocks to display current prices and news articles."
+                />
+
+                <FeatureCard
+                    title="Youtube"
+                    description="Review Youtube comment sentiment for discussion signals around each ticker."
+                />
+
+                <FeatureCard
                     title="Stock Graphing"
                     description="Visualize historical price movements, indicators, and trends with interactive charts."
                 />
 
                 <FeatureCard
                     title="Stock Agent (AI)"
-                    description="Ask questions, analyze scenarios, and get AI-powered insights tailored to your investment goals."
+                    description="Enter a stock ticker or company name and receive a GPT-powered report and prediction
+                                 based on current fetched and calculated data."
+
                 />
 
-                <FeatureCard
-                    title="Youtube"
-                    description="Review simulated Youtube sentiment for discussion signals around each ticker."
-                />
             </section>
         </div>
     )

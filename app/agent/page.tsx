@@ -87,6 +87,7 @@ type AgentContextResponse = {
     newsSentiment?: NewsSentiment
     socialSentiment?: SocialSentiment
     marketData?: MarketData | null
+    stockReport?: string | null
     error?: string
 }
 
@@ -180,6 +181,7 @@ export default function AgentPage() {
             const newsSentiment = ctx.newsSentiment
             const socialSentiment = ctx.socialSentiment
             const marketData = ctx.marketData
+            const stockReport = ctx.stockReport
 
             let agentResponse = `Here is the current context I found for ${displayName}:\n\n`
 
@@ -273,6 +275,13 @@ export default function AgentPage() {
                 agentResponse += `- Positive keyword hits: ${socialSentiment.positiveKeywords ?? 0}\n`
                 agentResponse += `- Negative keyword hits: ${socialSentiment.negativeKeywords ?? 0}\n`
                 agentResponse += `- Total posts analyzed: ${socialSentiment.total ?? 0}\n\n`
+            }
+
+            if (stockReport) {
+                agentResponse += 'Generated stock analysis report:\n'
+                agentResponse += `${stockReport}\n\n`
+            } else {
+                agentResponse += 'No GPT-generated stock analysis report was available at this time.\n\n'
             }
 
             const newsLinks = news
