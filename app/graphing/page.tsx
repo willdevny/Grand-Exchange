@@ -1,24 +1,34 @@
-"use client";
+ "use client";
 
 import { useEffect, useRef, useState} from "react";
 import * as d3 from "d3";
+import { useSession } from "next-auth/react";
 
-//type used for stock representation
 type importedStock = {
-    symbol: string; //stock ticker ex. MSFT, APPL, etc.
-    values: { //stores a year's worth of values, each an array of date, close
+    symbol: string;
+    values: { 
         date: string;
-        close: number; //closing price for given date
+        close: number; 
     }[];
-    color?: string; //stores the assigned color
+    color?: string; 
 };
+
+type ExportedStock = {
+    symbol: string;
+    values: {
+        date: string;
+        close: number;
+    }[];
+    color?: string;
+};
+
+type Overview = Record<string, string>;
 
 type StockApiResponseItem = {
     date: string;
     close: number;
 };
 
-//represents a single datapoint on a line
 type DataPoint = {
     date: Date;
     close: number;
@@ -47,18 +57,34 @@ type Stock = {
     color?: string;
     quote?: StockQuote;
     company?: CompanyInfo;
+    indicators?: Indicators;
+    overview?: Overview; 
 };
 
 type StockFetchResult = {
     values: DataPoint[];
     quote?: StockQuote;
     company?: CompanyInfo;
+    indicators?: Indicators;
+    overview?: Overview; 
+};
+
+
+type IndicatorDataPoint = {
+    date: Date;
+    value: number;
+};
+
+type Indicators = {
+    rsi?: IndicatorDataPoint[] | null;
+    sma?: IndicatorDataPoint[] | null;
+
 };
 
 type ViewMode = "compare" | "single";
 
-function StockDetails({ stock }: { stock: Stock }) {
 
+function StockDetails({ stock }: { stock: Stock }) {
     if (!stock.values.length) return null;
 
     const latest = stock.values[stock.values.length - 1];
@@ -70,10 +96,155 @@ function StockDetails({ stock }: { stock: Stock }) {
     const high = Math.max(...stock.values.map(v => v.close));
     const low = Math.min(...stock.values.map(v => v.close));
 
+    const detailItems = [
+        stock.quote && {
+            label: "Current Price",
+            value: `$${stock.quote.price}`,
+        },
+        stock.quote && {
+            label: "Day High",
+            value: `$${stock.quote.day_high}`,
+        },
+        stock.quote && {
+            label: "Day Low",
+            value: `$${stock.quote.day_low}`,
+        },
+        stock.quote && {
+            label: "Volume",
+            value: `${stock.quote.volume}`,
+        },
+        {
+            label: "Latest Close",
+            value: `$${latest.close.toFixed(2)}`,
+        },
+        {
+            label: "6M Change",
+            value: `$${change.toFixed(2)}`,
+        },
+        {
+            label: "% Change",
+            value: `${percentChange.toFixed(2)}%`,
+        },
+        {
+            label: "6M High",
+            value: `$${high.toFixed(2)}`,
+        },
+        {
+            label: "6M Low",
+            value: `$${low.toFixed(2)}`,
+        },
+        stock.overview?.MarketCapitalization && {
+            label: "Market Cap",
+            value: `$${stock.overview.MarketCapitalization}`,
+        },
+        stock.overview?.PERatio && {
+            label: "P/E Ratio",
+            value: stock.overview.PERatio,
+        },
+        stock.overview?.EPS && {
+            label: "EPS",
+            value: stock.overview.EPS,
+        },
+        stock.overview?.DividendYield && {
+            label: "Dividend Yield",
+            value: `${(Number(stock.overview.DividendYield) * 100).toFixed(2)}%`,
+        },
+        stock.overview?.AnalystTargetPrice && {
+            label: "Target Price",
+            value: `$${stock.overview.AnalystTargetPrice}`,
+        },
+        stock.overview?.Sector && {
+            label: "Sector",
+            value: stock.overview.Sector,
+        },
+        stock.overview?.Industry && {
+            label: "Industry",
+            value: stock.overview.Industry,
+        },
+        stock.overview?.Country && {
+            label: "Country",
+            value: stock.overview.Country,
+        },
+        stock.overview?.Exchange && {
+            label: "Exchange",
+            value: stock.overview.Exchange,
+        },
+        stock.overview?.BookValue && {
+            label: "Book Value",
+            value: stock.overview.BookValue,
+        },
+        stock.overview?.PriceToBookRatio && {
+            label: "P/B Ratio",
+            value: stock.overview.PriceToBookRatio,
+        },
+        stock.overview?.PriceToSalesRatioTTM && {
+            label: "P/S Ratio",
+            value: stock.overview.PriceToSalesRatioTTM,
+        },
+        stock.overview?.PEGRatio && {
+            label: "PEG Ratio",
+            value: stock.overview.PEGRatio,
+        },
+        stock.overview?.EVToEBITDA && {
+            label: "EV/EBITDA",
+            value: stock.overview.EVToEBITDA,
+        },
+        stock.overview?.ProfitMargin && {
+            label: "Profit Margin",
+            value: `${(Number(stock.overview.ProfitMargin) * 100).toFixed(2)}%`,
+        },
+        stock.overview?.OperatingMarginTTM && {
+            label: "Op. Margin",
+            value: `${(Number(stock.overview.OperatingMarginTTM) * 100).toFixed(2)}%`,
+        },
+        stock.overview?.ReturnOnEquityTTM && {
+            label: "ROE",
+            value: `${(Number(stock.overview.ReturnOnEquityTTM) * 100).toFixed(2)}%`,
+        },
+        stock.overview?.ReturnOnAssetsTTM && {
+            label: "ROA",
+            value: `${(Number(stock.overview.ReturnOnAssetsTTM) * 100).toFixed(2)}%`,
+        },
+        stock.overview?.QuarterlyEarningsGrowthYOY && {
+            label: "Earnings Growth YoY",
+            value: `${(Number(stock.overview.QuarterlyEarningsGrowthYOY) * 100).toFixed(2)}%`,
+        },
+        stock.overview?.QuarterlyRevenueGrowthYOY && {
+            label: "Revenue Growth YoY",
+            value: `${(Number(stock.overview.QuarterlyRevenueGrowthYOY) * 100).toFixed(2)}%`,
+        },
+        stock.quote?.previous_close && {
+            label: "Previous Close",
+            value: `$${stock.quote.previous_close}`,
+        },
+        stock.overview?.Beta && {
+            label: "Beta",
+            value: stock.overview.Beta,
+        },
+        stock.overview?.SharesOutstanding && {
+            label: "Shares Out",
+            value: stock.overview.SharesOutstanding,
+        },
+        stock.overview?.DividendPerShare && {
+            label: "Dividend / Share",
+            value: `$${stock.overview.DividendPerShare}`,
+        },
+        stock.overview?.DividendDate && {
+            label: "Dividend Date",
+            value: stock.overview.DividendDate,
+        },
+        stock.overview?.ExDividendDate && {
+            label: "Ex-Dividend",
+            value: stock.overview.ExDividendDate,
+        },
+        {
+            label: "Drawdown",
+            value: `${((high - latest.close) / high * 100).toFixed(2)}%`,
+        },
+    ].filter(Boolean) as { label: string; value: string }[];
+
     return (
         <div className="space-y-6">
-
-            {/* Company Info */}
             {stock.company && (
                 <div className="text-sm text-gray-600">
                     <div className="font-semibold">{stock.company.name}</div>
@@ -81,23 +252,14 @@ function StockDetails({ stock }: { stock: Stock }) {
                 </div>
             )}
 
-            {/* Quote Metrics */}
-            {stock.quote && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <DetailItem label="Current Price" value={`$${stock.quote.price}`} />
-                    <DetailItem label="Day High" value={`$${stock.quote.day_high}`} />
-                    <DetailItem label="Day Low" value={`$${stock.quote.day_low}`} />
-                    <DetailItem label="Volume" value={`${stock.quote.volume}`} />
-                </div>
-            )}
-
-            {/* Performance */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <DetailItem label="Latest Close" value={`$${latest.close.toFixed(2)}`} />
-                <DetailItem label="6M Change" value={`$${change.toFixed(2)}`} />
-                <DetailItem label="% Change" value={`${percentChange.toFixed(2)}%`} />
-                <DetailItem label="6M High" value={`$${high.toFixed(2)}`} />
-                <DetailItem label="6M Low" value={`$${low.toFixed(2)}`} />
+                {detailItems.map((item, index) => (
+                    <DetailItem
+                        key={index}
+                        label={item.label}
+                        value={item.value}
+                    />
+                ))}
             </div>
 
         </div>
@@ -116,10 +278,13 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 export default function GraphingPage() {
     // used for manipulating the chart <svg>
     const svgRef = useRef<SVGSVGElement | null>(null);
+
+    const { data: session } = useSession();
+
     //stores all stocks currently on the graph
     const [stocks, setStocks] = useState<Stock[]>([]);
     //determines data time range and graph x axis
-    const [selectedRangeDays, setSelectedRangeDays] = useState<number>(365);
+    const [selectedRangeDays, setSelectedRangeDays] = useState<number>(182);
     //controls input for stock ticker text field
     const [symbolInput, setSymbolInput] = useState("");
     //stores error messages meant for diaply
@@ -148,6 +313,46 @@ export default function GraphingPage() {
     // Fetch stock data via server API
     // -----------------------
     const MAX_API_DAYS = 182; // ~6 months
+
+    async function uploadToDrive(accessToken: string, data: ExportedStock[]) {
+        const metadata = {
+            name: "stock-chart.json",
+            mimeType: "application/json",
+        };
+
+        const file = new Blob(
+            [JSON.stringify(data, null, 2)],
+            { type: "application/json" }
+        );
+
+        const form = new FormData();
+        form.append(
+            "metadata",
+            new Blob([JSON.stringify(metadata)], { type: "application/json" })
+        );
+        form.append("file", file);
+
+        const res = await fetch(
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                },
+                body: form,
+            }
+        );
+
+        console.log("Drive status:", res.status);
+        const text = await res.text();
+        console.log("Drive response:", text);
+
+        if (!res.ok) {
+            throw new Error(text);
+        }
+
+        return JSON.parse(text);
+    }
 
     async function fetchStockData(symbol: string): Promise<StockFetchResult | null> {
         try {
@@ -190,6 +395,8 @@ export default function GraphingPage() {
                 values: slicedData,
                 quote: raw.quote ?? null,
                 company: raw.company ?? null,
+                indicators: raw.indicators ?? null,
+                overview: raw.overview ?? null
             };
         } catch (err) {
             console.error("Failed to fetch stock data:", err);
@@ -197,35 +404,66 @@ export default function GraphingPage() {
         }
     }
 
-    // Generate random stock data
-    // async function fetchStockData(symbol: string): Promise<DataPoint[]> {
-    //     const data: DataPoint[] = [];
-    //     const today = new Date();
-    //     let price = Math.random() * 100;
-    //
-    //     const currentDate = new Date(today);
-    //     let daysGenerated = 0;
-    //
-    //     while (daysGenerated < selectedRangeDays) {
-    //         const day = currentDate.getDay();
-    //
-    //         // 0 = Sunday, 6 = Saturday
-    //         if (day !== 0 && day !== 6) {
-    //             price = price * (1 + (Math.random() - 0.5) * 0.02);
-    //
-    //             data.unshift({
-    //                 date: new Date(currentDate),
-    //                 close: parseFloat(price.toFixed(2)),
-    //             });
-    //
-    //             daysGenerated++;
-    //         }
-    //
-    //         currentDate.setDate(currentDate.getDate() - 1);
-    //     }
-    //
-    //     return data;
-    // }
+    function calculateRSI(data: DataPoint[], period = 14): IndicatorDataPoint[] {
+        const result: IndicatorDataPoint[] = [];
+
+        let gains = 0;
+        let losses = 0;
+
+        // First period
+        for (let i = 1; i <= period; i++) {
+            const diff = data[i].close - data[i - 1].close;
+            if (diff >= 0) gains += diff;
+            else losses -= diff;
+        }
+
+        let avgGain = gains / period;
+        let avgLoss = losses / period;
+
+        result.push({
+            date: data[period].date,
+            value: 100 - 100 / (1 + avgGain / avgLoss),
+        });
+
+        // Remaining
+        for (let i = period + 1; i < data.length; i++) {
+            const diff = data[i].close - data[i - 1].close;
+
+            const gain = diff > 0 ? diff : 0;
+            const loss = diff < 0 ? -diff : 0;
+
+            avgGain = (avgGain * (period - 1) + gain) / period;
+            avgLoss = (avgLoss * (period - 1) + loss) / period;
+
+            const rsi = avgLoss === 0
+                ? 100
+                : 100 - 100 / (1 + avgGain / avgLoss);
+
+            result.push({
+                date: data[i].date,
+                value: rsi,
+            });
+        }
+
+        return result;
+    }
+
+    function calculateSMA(data: DataPoint[], period: number): IndicatorDataPoint[] {
+        const result: IndicatorDataPoint[] = [];
+
+        for (let i = period - 1; i < data.length; i++) {
+            const slice = data.slice(i - period + 1, i + 1);
+            const avg =
+                slice.reduce((sum, d) => sum + d.close, 0) / period;
+
+            result.push({
+                date: data[i].date,
+                value: avg,
+            });
+        }
+
+        return result;
+    }
 
     // -----------------------
     // Add stock
@@ -244,11 +482,19 @@ export default function GraphingPage() {
             setErrorMessage(null);
         }
 
+        const sma = calculateSMA(result.values, 20);
+        const rsi = calculateRSI(result.values, 14);
+
         const newStock: Stock = {
             symbol,
             values: result.values,
             quote: result.quote,
             company: result.company,
+            indicators: {
+                rsi,
+                sma
+            },
+            overview: result.overview,
             color: colorScale(symbol),
         };
 
@@ -400,6 +646,12 @@ export default function GraphingPage() {
         : activeStocks;
 
     useEffect(() => {
+        if (viewMode === "single") {
+            setShowAverage(false);
+        }
+    }, [viewMode]);
+
+    useEffect(() => {
         if (!svgRef.current) return;
 
         const svg = d3.select(svgRef.current);
@@ -413,7 +665,6 @@ export default function GraphingPage() {
             console.log(
                 "Date test:",
                 stocks[0].values[0].date,
-                stocks[0].values[0].date instanceof Date,
                 isNaN(stocks[0].values[0].date.getTime())
             );
         }
@@ -433,6 +684,8 @@ export default function GraphingPage() {
             return;
         }
 
+        console.log("SMA DATA:", filteredStocks[0]?.indicators?.sma);
+
         // ----- X SCALE -----
         const dates = allValues.map(d => d.date);
         const xExtent = d3.extent(dates) as [Date, Date];
@@ -447,6 +700,8 @@ export default function GraphingPage() {
         const yMin = d3.min(allValues, d => d.close) ?? 0;
         const yMax = d3.max(allValues, d => d.close) ?? 1;
         const yScale = d3.scaleLinear().domain([yMin, yMax]).range([height, 0]).nice();
+
+
 
         // ----- LINE GENERATOR -----
         const line = d3.line<DataPoint>()
@@ -490,12 +745,296 @@ export default function GraphingPage() {
                 .attr("opacity", 1);
         });
 
+        // ----- INTERACTION LAYER -----
+
+// Tooltip container
+        const tooltip = d3.select("body")
+            .append("div")
+            .style("position", "absolute")
+            .style("background", "white")
+            .style("padding", "6px 10px")
+            .style("border", "1px solid #ccc")
+            .style("border-radius", "6px")
+            .style("pointer-events", "none")
+            .style("opacity", 0);
+
+// Vertical crosshair line
+        const crosshair = g.append("line")
+            .attr("stroke", "#999")
+            .attr("stroke-width", 1)
+            .attr("y1", 0)
+            .attr("y2", height)
+            .style("opacity", 0);
+
+// Overlay rectangle to capture mouse
+        svg.append("rect")
+            .attr("transform", `translate(${margin.left},${margin.top})`)
+            .attr("width", width)
+            .attr("height", height)
+            .attr("fill", "transparent")
+            .on("mousemove", function (event) {
+                const [mouseX] = d3.pointer(event, this);
+                const x0 = xScale.invert(mouseX);
+
+
+                // Get closest point from first stock (can improve later)
+                const bisect = d3.bisector((d: DataPoint) => d.date).left;
+
+                const tooltipData = filteredStocks
+                    .map(stock => {
+                        if (!stock.values.length) return null;
+
+                        const index = bisect(stock.values, x0, 1);
+
+                        const d0 = stock.values[index - 1];
+                        const d1 = stock.values[index];
+
+                        const d =
+                            !d0 ? d1 :
+                                !d1 ? d0 :
+                                    x0.getTime() - d0.date.getTime() > d1.date.getTime() - x0.getTime()
+                                        ? d1
+                                        : d0;
+
+                        if (!d) return null;
+
+                        return {
+                            symbol: stock.symbol,
+                            date: d.date,
+                            price: d.close,
+                            color: stock.color
+                        };
+                    })
+                    .filter(Boolean);
+
+                // Move crosshair
+                const reference = tooltipData[0];
+
+                if (reference) {
+                    crosshair
+                        .attr("x1", xScale(reference.date))
+                        .attr("x2", xScale(reference.date))
+                        .style("opacity", 1);
+                }
+
+                tooltip
+                    .style("opacity", 1)
+                    .html(`
+                    <div style="font-weight:600;margin-bottom:6px;">
+                        ${reference ? reference.date.toDateString() : ""}
+                    </div>
+                ${tooltipData
+                        .map(
+                            d => `
+                        <div style="display:flex;justify-content:space-between;gap:12px;">
+                            <span style="color:${d?.color || '#000'};font-weight:500;">
+                                ${d?.symbol}
+                            </span>
+                            <span>
+                                $${d?.price.toFixed(2)}
+                            </span>
+                        </div>
+                        `
+                        )
+                        .join("")}
+                    `)
+                    .style("left", `${event.pageX + 10}px`)
+                    .style("top", `${event.pageY - 20}px`);
+            })
+            .on("mouseleave", () => {
+                tooltip.style("opacity", 0);
+                crosshair.style("opacity", 0);
+            });
+
         console.log("Chart rendered for stocks:", stocksToRender.map(s => s.symbol));
+
+        return () => {
+            d3.selectAll("body > div").filter(function () {
+                return d3.select(this).style("pointer-events") === "none";
+            }).remove();
+        };
     }, [stocksToRender, selectedRangeDays, viewMode]);
 
-    // -----------------------
-    // UI
-    // -----------------------
+    function SMAChart({ data }: { data: IndicatorDataPoint[] }) {
+        const ref = useRef<SVGSVGElement | null>(null);
+
+        useEffect(() => {
+            if (!ref.current || data.length === 0) return;
+
+            const width = 800;
+            const height = 150;
+            const margin = { top: 10, right: 20, bottom: 30, left: 40 };
+
+            const svg = d3.select(ref.current);
+            svg.selectAll("*").remove();
+
+            const x = d3.scaleTime()
+                .domain(d3.extent(data, d => d.date) as [Date, Date])
+                .range([margin.left, width - margin.right]);
+
+            const y = d3.scaleLinear()
+                .domain(d3.extent(data, d => d.value) as [number, number])
+                .range([height - margin.bottom, margin.top]);
+
+            const line = d3.line<IndicatorDataPoint>()
+                .x(d => x(d.date))
+                .y(d => y(d.value));
+
+            // X Axis
+            svg.append("g")
+                .attr("transform", `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(x));
+
+            // Y Axis
+            svg.append("g")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(d3.axisLeft(y));
+
+            svg.selectAll(".domain")
+                .attr("stroke", "#9ca3af");
+
+            svg.selectAll(".tick line")
+                .attr("stroke", "#e5e7eb");
+
+            svg.selectAll(".tick text")
+                .attr("fill", "#6b7280")
+                .style("font-size", "10px");
+
+            // X label
+            svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height)
+                .attr("text-anchor", "middle")
+                .style("font-size", "10px")
+                .attr("fill", "#6b7280")
+                .text("Date");
+
+            // Y label
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("x", -height / 2)
+                .attr("y", 12)
+                .attr("text-anchor", "middle")
+                .style("font-size", "10px")
+                .attr("fill", "#6b7280")
+                .text("SMA");
+
+            svg.append("g")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(
+                    d3.axisLeft(y)
+                        .tickSize(-(width - margin.left - margin.right))
+                        .tickFormat(() => "")
+                )
+                .selectAll("line")
+                .attr("stroke", "#e5e7eb")
+                .attr("stroke-dasharray", "2,2");
+
+            svg.append("path")
+                .datum(data)
+                .attr("fill", "none")
+                .attr("stroke", "orange")
+                .attr("stroke-width", 2)
+                .attr("d", line);
+
+        }, [data]);
+
+        return <svg ref={ref} width={800} height={150} />;
+    }
+
+    function RSIChart({ data }: { data: IndicatorDataPoint[] }) {
+        const ref = useRef<SVGSVGElement | null>(null);
+
+        useEffect(() => {
+            if (!ref.current || data.length === 0) return;
+
+            const width = 800;
+            const height = 150;
+            const margin = { top: 10, right: 20, bottom: 30, left: 40 };
+
+            const svg = d3.select(ref.current);
+            svg.selectAll("*").remove();
+
+            const x = d3.scaleTime()
+                .domain(d3.extent(data, d => d.date) as [Date, Date])
+                .range([margin.left, width - margin.right]);
+
+            const y = d3.scaleLinear()
+                .domain([0, 100])
+                .range([height - margin.bottom, margin.top]);
+
+            const line = d3.line<IndicatorDataPoint>()
+                .x(d => x(d.date))
+                .y(d => y(d.value));
+
+            svg.append("g")
+                .attr("transform", `translate(0,${height - margin.bottom})`)
+                .call(d3.axisBottom(x));
+
+            svg.append("g")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(d3.axisLeft(y));
+
+            svg.selectAll(".domain")
+                .attr("stroke", "#9ca3af");
+
+            svg.selectAll(".tick line")
+                .attr("stroke", "#e5e7eb");
+
+            svg.selectAll(".tick text")
+                .attr("fill", "#6b7280")
+                .style("font-size", "10px");
+
+            svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height)
+                .attr("text-anchor", "middle")
+                .style("font-size", "10px")
+                .attr("fill", "#6b7280")
+                .text("Date");
+
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("x", -height / 2)
+                .attr("y", 12)
+                .attr("text-anchor", "middle")
+                .style("font-size", "10px")
+                .attr("fill", "#6b7280")
+                .text("RSI (0–100)");
+
+            svg.append("g")
+                .attr("transform", `translate(${margin.left},0)`)
+                .call(
+                    d3.axisLeft(y)
+                        .tickSize(-(width - margin.left - margin.right))
+                        .tickFormat(() => "")
+                )
+                .selectAll("line")
+                .attr("stroke", "#e5e7eb")
+                .attr("stroke-dasharray", "2,2");
+
+            svg.append("path")
+                .datum(data)
+                .attr("fill", "none")
+                .attr("stroke", "purple")
+                .attr("stroke-width", 2)
+                .attr("d", line);
+
+            [70, 30].forEach(level => {
+                svg.append("line")
+                    .attr("x1", margin.left)
+                    .attr("x2", width - margin.right)
+                    .attr("y1", y(level))
+                    .attr("y2", y(level))
+                    .attr("stroke", level === 70 ? "red" : "green")
+                    .attr("stroke-dasharray", "4");
+            });
+
+        }, [data]);
+
+        return <svg ref={ref} width={800} height={150} />;
+    }
+
     const ranges = [
         { label: "7D", days: 7 },
         { label: "30D", days: 30 },
@@ -609,7 +1148,12 @@ export default function GraphingPage() {
                         {/* Add Average Button */}
                         <button
                             onClick={handleAddAverage}
-                            className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition text-sm font-medium"
+                            disabled={viewMode === "single"}
+                            className={`px-4 py-2 rounded-lg border text-sm font-medium transition
+                                ${viewMode === "single"
+                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                                : "border-gray-300 hover:bg-gray-100"
+                            }`}
                         >
                             Toggle Average
                         </button>
@@ -649,9 +1193,17 @@ export default function GraphingPage() {
 
                                     {stock.symbol !== "AVERAGE" && (
                                         <button
-                                            onClick={() =>
-                                                setStocks(stocks.filter((s) => s.symbol !== stock.symbol))
-                                            }
+                                            onClick={() => {
+                                                setStocks((prev) => {
+                                                    const updated = prev.filter((s) => s.symbol !== stock.symbol);
+
+                                                    if (selectedStock?.symbol === stock.symbol) {
+                                                        setSelectedStock(updated.length > 0 ? updated[updated.length - 1] : null);
+                                                    }
+
+                                                    return updated;
+                                                });
+                                            }}
                                             className="text-xs text-red-500 hover:text-red-700"
                                         >
                                             Remove
@@ -696,6 +1248,22 @@ export default function GraphingPage() {
                     </div>
                 )}
 
+                {viewMode === "single" && selectedStock && (
+                    <div className="bg-white rounded-2xl shadow-lg p-6">
+                        <div className="flex flex-col gap-6">
+
+                            {selectedStock.indicators?.sma && (
+                                <SMAChart data={selectedStock.indicators.sma} />
+                            )}
+
+                            {selectedStock.indicators?.rsi && (
+                                <RSIChart data={selectedStock.indicators.rsi} />
+                            )}
+
+                        </div>
+                    </div>
+                )}
+
                 {/* Import / Export Card */}
                 <div className="bg-white rounded-2xl shadow-lg p-6 flex flex-wrap items-center justify-between gap-4">
 
@@ -705,6 +1273,30 @@ export default function GraphingPage() {
                             className="px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800 transition text-sm"
                         >
                             Export JSON
+                        </button>
+
+                        <button
+                            onClick={async () => {
+                                if (!session?.accessToken) {
+                                    alert("You must be signed in");
+                                    return;
+                                }
+
+                                const exportData = stocks.map((s) => ({
+                                    symbol: s.symbol,
+                                    values: s.values.map((v) => ({
+                                        date: v.date.toISOString(),
+                                        close: v.close,
+                                    })),
+                                    color: s.color,
+                                }));
+                                const result = await uploadToDrive(session.accessToken, exportData);
+                                console.log("Uploaded to Drive:", result);
+                                alert("Saved to Google Drive!");
+                            }}
+                            className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition text-sm"
+                        >
+                            Save to Google Drive
                         </button>
 
                         <label className="px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition text-sm cursor-pointer">
