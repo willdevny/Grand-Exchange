@@ -6,6 +6,19 @@ const handler = NextAuth({
         GoogleProvider({
             clientId: process.env.GOOGLE_CLIENT_ID!,
             clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            authorization: {
+                params: {
+                    scope: [
+                        "openid email profile https://www.googleapis.com/auth/drive.file",
+                        "openid",
+                        "email",
+                        "profile",
+                        "https://www.googleapis.com/auth/drive.file", // 👈 ADD THIS
+                    ].join(" "),
+                    access_type: "offline",
+                    prompt: "consent",
+                },
+            },
         }),
     ],
     session: { strategy: 'jwt' },
@@ -17,16 +30,23 @@ const handler = NextAuth({
                 session.user.email = token.email as string | null | undefined
                 session.user.image = token.picture as string | null | undefined
             }
+
+            session.accessToken = token.accessToken as string;
+
             return session
         },
-        async jwt({ token, profile }) {
+        async jwt({ token, account, profile }) {
             // For Google, profile picture is commonly here
             if (profile && 'picture' in profile) {
                 token.picture = profile.picture as string
+            }
+
+            if (account) {
+                token.accessToken = account.access_token;
             }
             return token
         },
     },
 })
 
-export { handler as GET, handler as POST }
+export { handler as POST }
