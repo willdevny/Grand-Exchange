@@ -4,13 +4,14 @@ import { useEffect, useRef, useState} from "react";
 import * as d3 from "d3";
 import { useSession } from "next-auth/react";
 
+//type used for stock representation
 type importedStock = {
-    symbol: string;
-    values: { 
+    symbol: string; //stock ticker ex. MSFT, APPL, etc.
+    values: { //stores a year's worth of values, each an array of date, close
         date: string;
-        close: number; 
+        close: number; //closing price for given date
     }[];
-    color?: string; 
+    color?: string; //stores the assigned color
 };
 
 type ExportedStock = {
@@ -29,6 +30,7 @@ type StockApiResponseItem = {
     close: number;
 };
 
+//represents a single datapoint on a line
 type DataPoint = {
     date: Date;
     close: number;
@@ -58,7 +60,7 @@ type Stock = {
     quote?: StockQuote;
     company?: CompanyInfo;
     indicators?: Indicators;
-    overview?: Overview; 
+    overview?: Overview; // ✅ NEW
 };
 
 type StockFetchResult = {
@@ -66,7 +68,7 @@ type StockFetchResult = {
     quote?: StockQuote;
     company?: CompanyInfo;
     indicators?: Indicators;
-    overview?: Overview; 
+    overview?: Overview; // ✅ NEW
 };
 
 
@@ -84,7 +86,12 @@ type Indicators = {
 type ViewMode = "compare" | "single";
 
 
-function StockDetails({ stock }: { stock: Stock }) {
+ function normalizeDate(dateStr: string): Date {
+     const [y, m, d] = dateStr.split("T")[0].split("-").map(Number);
+     return new Date(y, m - 1, d); // stays consistent
+ }
+
+ function StockDetails({ stock }: { stock: Stock }) {
     if (!stock.values.length) return null;
 
     const latest = stock.values[stock.values.length - 1];
@@ -375,7 +382,7 @@ export default function GraphingPage() {
 
             // Convert API history into DataPoint[]
             const data: DataPoint[] = raw.data.map((item: StockApiResponseItem) => ({
-                date: new Date(item.date),
+                date: normalizeDate(item.date),
                 close: Number(item.close),
             }));
 
@@ -537,16 +544,25 @@ export default function GraphingPage() {
         const averagedValues: DataPoint[] = allDates.map(date => {
 
             const values = baseStocks.map(
-                s => s.values.find(v => v.date.getTime() === date.getTime())?.close
+                s => s.values.find(v =>
+                    v.date.getFullYear() === date.getFullYear() &&
+                    v.date.getMonth() === date.getMonth() &&
+                    v.date.getDate() === date.getDate()
+                )
             );
 
-            const numericValues = values.map(v => v ?? 0);
+            const numericValues = values
+                .filter((v): v is DataPoint => v !== undefined)
+                .map(v => v.close);
+
+            if (numericValues.length === 0) return null;
 
             const avg =
-                numericValues.reduce((sum, v) => sum + v, 0) / baseStocks.length;
+                numericValues.reduce((sum, v) => sum + v, 0) / numericValues.length;
 
             return { date, close: avg };
-        });
+        })
+            .filter((d): d is DataPoint => d !== null);
 
         return {
             symbol: "AVERAGE",
@@ -605,7 +621,7 @@ export default function GraphingPage() {
                 const importedStocks: Stock[] = (json as importedStock[]).map((s) => ({
                     symbol: s.symbol,
                     values: s.values.map((v) => ({
-                        date: new Date(v.date),
+                        date: normalizeDate(v.date),
                         close: v.close,
                     })),
                     color: s.color || colorScale(s.symbol) || "#000000", // use imported color if available
@@ -669,7 +685,15 @@ export default function GraphingPage() {
             );
         }
 
-        const cutoffDate = new Date(Date.now() - selectedRangeDays * 24 * 60 * 60 * 1000);
+        const cutoffRaw = new Date(
+            Date.now() - selectedRangeDays * 24 * 60 * 60 * 1000
+        );
+
+        const cutoffDate = new Date(
+            cutoffRaw.getFullYear(),
+            cutoffRaw.getMonth(),
+            cutoffRaw.getDate()
+        );
 
         const filteredStocks = stocksToRender.map(stock => ({
             ...stock,
@@ -712,9 +736,18 @@ export default function GraphingPage() {
         // ----- AXES -----
         const formatDay = d3.timeFormat("%b %d");
         const formatMonth = d3.timeFormat("%b '%y");
+        const tickInterval =
+            selectedRangeDays <= 7
+                ? d3.timeDay.every(1)
+                : selectedRangeDays <= 30
+                    ? d3.timeDay.every(3)
+                    : d3.timeMonth.every(1);
+
         const xAxis = d3.axisBottom<Date>(xScale)
-            .ticks(Math.min(10, selectedRangeDays))
-            .tickFormat(d => d instanceof Date ? (selectedRangeDays <= 60 ? formatDay(d) : formatMonth(d)) : "");
+            .ticks(tickInterval)
+            .tickFormat(d =>
+                selectedRangeDays <= 60 ? formatDay(d as Date) : formatMonth(d as Date)
+            );
 
         g.append("g").attr("transform", `translate(0,${height})`).call(xAxis);
         g.append("g").call(d3.axisLeft(yScale));
@@ -967,10 +1000,12 @@ export default function GraphingPage() {
                 .x(d => x(d.date))
                 .y(d => y(d.value));
 
+            // X Axis
             svg.append("g")
                 .attr("transform", `translate(0,${height - margin.bottom})`)
                 .call(d3.axisBottom(x));
 
+            // Y Axis
             svg.append("g")
                 .attr("transform", `translate(${margin.left},0)`)
                 .call(d3.axisLeft(y));
@@ -985,6 +1020,7 @@ export default function GraphingPage() {
                 .attr("fill", "#6b7280")
                 .style("font-size", "10px");
 
+            // X label
             svg.append("text")
                 .attr("x", width / 2)
                 .attr("y", height)
@@ -993,6 +1029,7 @@ export default function GraphingPage() {
                 .attr("fill", "#6b7280")
                 .text("Date");
 
+            // Y label
             svg.append("text")
                 .attr("transform", "rotate(-90)")
                 .attr("x", -height / 2)
@@ -1020,6 +1057,7 @@ export default function GraphingPage() {
                 .attr("stroke-width", 2)
                 .attr("d", line);
 
+            // Zones
             [70, 30].forEach(level => {
                 svg.append("line")
                     .attr("x1", margin.left)
@@ -1035,6 +1073,9 @@ export default function GraphingPage() {
         return <svg ref={ref} width={800} height={150} />;
     }
 
+    // -----------------------
+    // UI
+    // -----------------------
     const ranges = [
         { label: "7D", days: 7 },
         { label: "30D", days: 30 },
