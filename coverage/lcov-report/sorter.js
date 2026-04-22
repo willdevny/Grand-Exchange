@@ -102,7 +102,7 @@ var addSorting = (function() {
         for (i = 0; i < tableCols.length; i += 1) {
             colNode = tableCols[i];
             col = cols[i];
-            val = colNode.getAttribute('data-value');
+            val = colNode.dataset.value;
             if (col.type === 'number') {
                 val = Number(val);
             }
