@@ -74,9 +74,9 @@ export default function TwitterStocksPage() {
   return (
     <div className="space-y-10">
       <section className="card p-8 space-y-4">
-        <h1 className="text-4xl font-extrabold">X/Twitter Stocks (Live)</h1>
+        <h1 className="text-4xl font-extrabold">Stock Tracking</h1>
         <p className="text-lg text-gray-700 dark:text-gray-300">
-          This page pulls live quotes + headlines from external APIs (no live X feed).
+          This page pulls live stock quotes and news articles from external APIs.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
@@ -151,7 +151,7 @@ export default function TwitterStocksPage() {
         </div>
 
         <div className="card p-6 lg:col-span-2 space-y-4">
-          <h2 className="text-2xl font-extrabold">Latest headlines for <span className="underline">{selected}</span></h2>
+          <h2 className="text-2xl font-extrabold">Latest news for <span className="underline">{selected}</span></h2>
 
           <div className="space-y-3">
             {news.length === 0 && (

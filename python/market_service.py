@@ -68,7 +68,11 @@ def summarize_trend(latest_close: float | None, sma20: float | None, sma50: floa
     return "mixed"
 
 
-@app.get("/market")
+@app.get(
+    "/market",
+    responses={404: {"description": "No historical data found for the given ticker"},
+               500: {"description": "Internal server error"}}
+)
 def get_market_data(ticker: str, period: str = "6mo"):
     try:
         stock = yf.Ticker(ticker)
