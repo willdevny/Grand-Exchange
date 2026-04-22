@@ -91,187 +91,199 @@ type ViewMode = "compare" | "single";
      return new Date(y, m - 1, d); // stays consistent
  }
 
+ type DetailItem = {
+     label: string;
+     value: string;
+ };
+
+ function addDetail(
+     items: DetailItem[],
+     label: string,
+     value: string | number | null | undefined
+ ) {
+     if (value === null || value === undefined || value === "") {
+         return;
+     }
+
+     items.push({
+         label,
+         value: String(value),
+     });
+ }
+
+ function addDollarDetail(
+     items: DetailItem[],
+     label: string,
+     value: string | number | null | undefined
+ ) {
+     if (value === null || value === undefined || value === "") {
+         return;
+     }
+
+     items.push({
+         label,
+         value: `$${value}`,
+     });
+ }
+
+ function addPercentDetail(
+     items: DetailItem[],
+     label: string,
+     value: string | number | null | undefined
+ ) {
+     if (value === null || value === undefined || value === "") {
+         return;
+     }
+
+     const numericValue = Number(value);
+     if (Number.isNaN(numericValue)) {
+         return;
+     }
+
+     items.push({
+         label,
+         value: `${(numericValue * 100).toFixed(2)}%`,
+     });
+ }
+
+ function buildQuoteDetails(stock: Stock): DetailItem[] {
+     const items: DetailItem[] = [];
+     const quote = stock.quote;
+
+     if (!quote) {
+         return items;
+     }
+
+     addDollarDetail(items, "Current Price", quote.price);
+     addDollarDetail(items, "Day High", quote.day_high);
+     addDollarDetail(items, "Day Low", quote.day_low);
+     addDetail(items, "Volume", quote.volume);
+     addDollarDetail(items, "Previous Close", quote.previous_close);
+
+     return items;
+ }
+
+ function buildOverviewDetails(stock: Stock): DetailItem[] {
+     const items: DetailItem[] = [];
+     const overview = stock.overview;
+
+     if (!overview) {
+         return items;
+     }
+
+     addDollarDetail(items, "Market Cap", overview.MarketCapitalization);
+     addDetail(items, "P/E Ratio", overview.PERatio);
+     addDetail(items, "EPS", overview.EPS);
+     addPercentDetail(items, "Dividend Yield", overview.DividendYield);
+     addDollarDetail(items, "Target Price", overview.AnalystTargetPrice);
+     addDetail(items, "Sector", overview.Sector);
+     addDetail(items, "Industry", overview.Industry);
+     addDetail(items, "Country", overview.Country);
+     addDetail(items, "Exchange", overview.Exchange);
+     addDetail(items, "Book Value", overview.BookValue);
+     addDetail(items, "P/B Ratio", overview.PriceToBookRatio);
+     addDetail(items, "P/S Ratio", overview.PriceToSalesRatioTTM);
+     addDetail(items, "PEG Ratio", overview.PEGRatio);
+     addDetail(items, "EV/EBITDA", overview.EVToEBITDA);
+     addPercentDetail(items, "Profit Margin", overview.ProfitMargin);
+     addPercentDetail(items, "Op. Margin", overview.OperatingMarginTTM);
+     addPercentDetail(items, "ROE", overview.ReturnOnEquityTTM);
+     addPercentDetail(items, "ROA", overview.ReturnOnAssetsTTM);
+     addPercentDetail(
+         items,
+         "Earnings Growth YoY",
+         overview.QuarterlyEarningsGrowthYOY
+     );
+     addPercentDetail(
+         items,
+         "Revenue Growth YoY",
+         overview.QuarterlyRevenueGrowthYOY
+     );
+     addDetail(items, "Beta", overview.Beta);
+     addDetail(items, "Shares Out", overview.SharesOutstanding);
+     addDollarDetail(items, "Dividend / Share", overview.DividendPerShare);
+     addDetail(items, "Dividend Date", overview.DividendDate);
+     addDetail(items, "Ex-Dividend", overview.ExDividendDate);
+
+     return items;
+ }
+
+ function buildBaseDetails(stock: Stock): DetailItem[] {
+     if (!stock.values.length) {
+         return [];
+     }
+
+     const latest = stock.values[stock.values.length - 1];
+     const first = stock.values[0];
+     const change = latest.close - first.close;
+     const percentChange = (change / first.close) * 100;
+     const closes = stock.values.map((v) => v.close);
+     const high = Math.max(...closes);
+     const low = Math.min(...closes);
+     const drawdown = ((high - latest.close) / high) * 100;
+
+     return [
+         {
+             label: "Latest Close",
+             value: `$${latest.close.toFixed(2)}`,
+         },
+         {
+             label: "6M Change",
+             value: `$${change.toFixed(2)}`,
+         },
+         {
+             label: "% Change",
+             value: `${percentChange.toFixed(2)}%`,
+         },
+         {
+             label: "6M High",
+             value: `$${high.toFixed(2)}`,
+         },
+         {
+             label: "6M Low",
+             value: `$${low.toFixed(2)}`,
+         },
+         {
+             label: "Drawdown",
+             value: `${drawdown.toFixed(2)}%`,
+         },
+     ];
+ }
+
+ function buildDetailItems(stock: Stock): DetailItem[] {
+     return [
+         ...buildQuoteDetails(stock),
+         ...buildBaseDetails(stock),
+         ...buildOverviewDetails(stock),
+     ];
+ }
+
  function StockDetails({ stock }: { stock: Stock }) {
-    if (!stock.values.length) return null;
+     if (!stock.values.length) return null;
 
-    const latest = stock.values[stock.values.length - 1];
-    const first = stock.values[0];
+     const detailItems = buildDetailItems(stock);
 
-    const change = latest.close - first.close;
-    const percentChange = (change / first.close) * 100;
+     return (
+         <div className="space-y-6">
+             {stock.company && (
+                 <div className="text-sm text-gray-600">
+                     <div className="font-semibold">{stock.company.name}</div>
+                     <div>{stock.company.industry}</div>
+                 </div>
+             )}
 
-    const high = Math.max(...stock.values.map(v => v.close));
-    const low = Math.min(...stock.values.map(v => v.close));
-
-    const detailItems = [
-        stock.quote && {
-            label: "Current Price",
-            value: `$${stock.quote.price}`,
-        },
-        stock.quote && {
-            label: "Day High",
-            value: `$${stock.quote.day_high}`,
-        },
-        stock.quote && {
-            label: "Day Low",
-            value: `$${stock.quote.day_low}`,
-        },
-        stock.quote && {
-            label: "Volume",
-            value: `${stock.quote.volume}`,
-        },
-        {
-            label: "Latest Close",
-            value: `$${latest.close.toFixed(2)}`,
-        },
-        {
-            label: "6M Change",
-            value: `$${change.toFixed(2)}`,
-        },
-        {
-            label: "% Change",
-            value: `${percentChange.toFixed(2)}%`,
-        },
-        {
-            label: "6M High",
-            value: `$${high.toFixed(2)}`,
-        },
-        {
-            label: "6M Low",
-            value: `$${low.toFixed(2)}`,
-        },
-        stock.overview?.MarketCapitalization && {
-            label: "Market Cap",
-            value: `$${stock.overview.MarketCapitalization}`,
-        },
-        stock.overview?.PERatio && {
-            label: "P/E Ratio",
-            value: stock.overview.PERatio,
-        },
-        stock.overview?.EPS && {
-            label: "EPS",
-            value: stock.overview.EPS,
-        },
-        stock.overview?.DividendYield && {
-            label: "Dividend Yield",
-            value: `${(Number(stock.overview.DividendYield) * 100).toFixed(2)}%`,
-        },
-        stock.overview?.AnalystTargetPrice && {
-            label: "Target Price",
-            value: `$${stock.overview.AnalystTargetPrice}`,
-        },
-        stock.overview?.Sector && {
-            label: "Sector",
-            value: stock.overview.Sector,
-        },
-        stock.overview?.Industry && {
-            label: "Industry",
-            value: stock.overview.Industry,
-        },
-        stock.overview?.Country && {
-            label: "Country",
-            value: stock.overview.Country,
-        },
-        stock.overview?.Exchange && {
-            label: "Exchange",
-            value: stock.overview.Exchange,
-        },
-        stock.overview?.BookValue && {
-            label: "Book Value",
-            value: stock.overview.BookValue,
-        },
-        stock.overview?.PriceToBookRatio && {
-            label: "P/B Ratio",
-            value: stock.overview.PriceToBookRatio,
-        },
-        stock.overview?.PriceToSalesRatioTTM && {
-            label: "P/S Ratio",
-            value: stock.overview.PriceToSalesRatioTTM,
-        },
-        stock.overview?.PEGRatio && {
-            label: "PEG Ratio",
-            value: stock.overview.PEGRatio,
-        },
-        stock.overview?.EVToEBITDA && {
-            label: "EV/EBITDA",
-            value: stock.overview.EVToEBITDA,
-        },
-        stock.overview?.ProfitMargin && {
-            label: "Profit Margin",
-            value: `${(Number(stock.overview.ProfitMargin) * 100).toFixed(2)}%`,
-        },
-        stock.overview?.OperatingMarginTTM && {
-            label: "Op. Margin",
-            value: `${(Number(stock.overview.OperatingMarginTTM) * 100).toFixed(2)}%`,
-        },
-        stock.overview?.ReturnOnEquityTTM && {
-            label: "ROE",
-            value: `${(Number(stock.overview.ReturnOnEquityTTM) * 100).toFixed(2)}%`,
-        },
-        stock.overview?.ReturnOnAssetsTTM && {
-            label: "ROA",
-            value: `${(Number(stock.overview.ReturnOnAssetsTTM) * 100).toFixed(2)}%`,
-        },
-        stock.overview?.QuarterlyEarningsGrowthYOY && {
-            label: "Earnings Growth YoY",
-            value: `${(Number(stock.overview.QuarterlyEarningsGrowthYOY) * 100).toFixed(2)}%`,
-        },
-        stock.overview?.QuarterlyRevenueGrowthYOY && {
-            label: "Revenue Growth YoY",
-            value: `${(Number(stock.overview.QuarterlyRevenueGrowthYOY) * 100).toFixed(2)}%`,
-        },
-        stock.quote?.previous_close && {
-            label: "Previous Close",
-            value: `$${stock.quote.previous_close}`,
-        },
-        stock.overview?.Beta && {
-            label: "Beta",
-            value: stock.overview.Beta,
-        },
-        stock.overview?.SharesOutstanding && {
-            label: "Shares Out",
-            value: stock.overview.SharesOutstanding,
-        },
-        stock.overview?.DividendPerShare && {
-            label: "Dividend / Share",
-            value: `$${stock.overview.DividendPerShare}`,
-        },
-        stock.overview?.DividendDate && {
-            label: "Dividend Date",
-            value: stock.overview.DividendDate,
-        },
-        stock.overview?.ExDividendDate && {
-            label: "Ex-Dividend",
-            value: stock.overview.ExDividendDate,
-        },
-        {
-            label: "Drawdown",
-            value: `${((high - latest.close) / high * 100).toFixed(2)}%`,
-        },
-    ].filter(Boolean) as { label: string; value: string }[];
-
-    return (
-        <div className="space-y-6">
-            {stock.company && (
-                <div className="text-sm text-gray-600">
-                    <div className="font-semibold">{stock.company.name}</div>
-                    <div>{stock.company.industry}</div>
-                </div>
-            )}
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                {detailItems.map((item, index) => (
-                    <DetailItem
-                        key={index}
-                        label={item.label}
-                        value={item.value}
-                    />
-                ))}
-            </div>
-
-        </div>
-    );
-}
+             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                 {detailItems.map((item) => (
+                     <DetailItem
+                         key={item.label}
+                         label={item.label}
+                         value={item.value}
+                     />
+                 ))}
+             </div>
+         </div>
+     );
+ }
 
 function DetailItem({ label, value }: { label: string; value: string }) {
     return (
