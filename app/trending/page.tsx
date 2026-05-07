@@ -1,19 +1,19 @@
 "use client"
 import { useState, useEffect } from "react"
 
-// 🔹 Stock data WITH local + fallback logos
-const stocksData = [
-    { name: "DuPont", ticker: "DD", logo: "/stockLogos/DD_logo.png", predictions: { d30: -2, d60: -3, d90: -8 } },
-    { name: "Halliburton", ticker: "HAL", logo: "/stockLogos/HAL_logo.png", predictions: { d30: 2, d60: 1, d90: -1 } },
-    { name: "Northrop Grumman", ticker: "NOC", logo: "/stockLogos/NOC_logo.png", predictions: { d30: 1, d60: 1, d90: 3 } },
-    { name: "Prudential Financial", ticker: "PRU", logo: "/stockLogos/PRU_logo.png", predictions: { d30: -1, d60: 3, d90: 4 } },
-    { name: "Travelers", ticker: "TRV", logo: "/stockLogos/TRV_logo.png", predictions: { d30: -2, d60: -3, d90: -2 } },
-    { name: "Coca-Cola", ticker: "KO", logo: "/stockLogos/KO_logo.png", predictions: { d30: 3, d60: 2, d90: 5 } },
-    { name: "Chevron", ticker: "CVX", logo: "/stockLogos/CVX_logo.png", predictions: { d30: -2, d60: -1, d90: 3 } },
-    { name: "BlackRock", ticker: "BLK", logo: "/stockLogos/BLK_logo.png", predictions: { d30: -3, d60: -2, d90: 3 } },
-    { name: "Ford", ticker: "F", logo: "/stockLogos/F_logo.png", predictions: { d30: -2, d60: -1, d90: 1 } },
-    { name: "Intel", ticker: "INTC", logo: "/stockLogos/INTC_logo.png", predictions: { d30: -2, d60: -2, d90: 1 } },
-];
+// 🔹 Static stock info only
+const stockInfo = {
+    DD: { name: "DuPont", logo: "/stockLogos/DD_logo.png" },
+    HAL: { name: "Halliburton", logo: "/stockLogos/HAL_logo.png" },
+    NOC: { name: "Northrop Grumman", logo: "/stockLogos/NOC_logo.png" },
+    PRU: { name: "Prudential Financial", logo: "/stockLogos/PRU_logo.png" },
+    TRV: { name: "Travelers", logo: "/stockLogos/TRV_logo.png" },
+    KO: { name: "Coca-Cola", logo: "/stockLogos/KO_logo.png" },
+    CVX: { name: "Chevron", logo: "/stockLogos/CVX_logo.png" },
+    BLK: { name: "BlackRock", logo: "/stockLogos/BLK_logo.png" },
+    F: { name: "Ford", logo: "/stockLogos/F_logo.png" },
+    INTC: { name: "Intel", logo: "/stockLogos/INTC_logo.png" },
+}
 
 // 🔹 Arrow component
 function PredictionArrow({ value }) {
@@ -32,19 +32,20 @@ function PredictionArrow({ value }) {
 
     return (
         <div className={`flex flex-col items-center ${color}`}>
-      <span className={size}>
-        {isPositive ? "▲" : "▼"}
-      </span>
-            <span className="text-xs">{value}%</span>
+            <span className={size}>
+                {isPositive ? "▲" : "▼"}
+            </span>
+
+            <span className="text-xs">
+                {value.toFixed(1)}%
+            </span>
         </div>
     )
 }
 
 // 🔹 Stock card
 function StockCard({ stock }) {
-    // ✅ FIX: use local logo first, fallback to Clearbit
-    const logoUrl =
-        stock.logo || `https://logo.clearbit.com/${stock.domain}`
+    const logoUrl = stock.logo
 
     return (
         <div className="flex items-center justify-between p-4 rounded-2xl bg-white dark:bg-gray-800 shadow hover:shadow-lg transition">
@@ -64,6 +65,7 @@ function StockCard({ stock }) {
                     <div className="font-semibold text-lg">
                         {stock.name}
                     </div>
+
                     <div className="text-gray-500 text-sm">
                         {stock.ticker}
                     </div>
@@ -72,20 +74,22 @@ function StockCard({ stock }) {
 
             {/* Right: predictions */}
             <div className="flex space-x-6">
+
                 <div className="text-center">
-                    <div className="text-xs text-gray-400">30D</div>
-                    <PredictionArrow value={stock.predictions.d30} />
+                    <div className="text-xs text-gray-400">2W</div>
+                    <PredictionArrow value={stock.predictions.d2w} />
                 </div>
 
                 <div className="text-center">
-                    <div className="text-xs text-gray-400">60D</div>
-                    <PredictionArrow value={stock.predictions.d60} />
+                    <div className="text-xs text-gray-400">1M</div>
+                    <PredictionArrow value={stock.predictions.d1m} />
                 </div>
 
                 <div className="text-center">
-                    <div className="text-xs text-gray-400">90D</div>
-                    <PredictionArrow value={stock.predictions.d90} />
+                    <div className="text-xs text-gray-400">3M</div>
+                    <PredictionArrow value={stock.predictions.d3m} />
                 </div>
+
             </div>
         </div>
     )
@@ -96,7 +100,65 @@ export default function TrendingPage() {
     const [stocks, setStocks] = useState([])
 
     useEffect(() => {
-        setStocks(stocksData)
+        async function fetchPredictions() {
+            try {
+                const response = await fetch(
+                    "http://71.113.149.31:5000/getPredictions"
+                )
+
+                const data = await response.json()
+
+                /*
+                  Expected format:
+                  {
+                    "DD_2week": 3.6,
+                    "DD_1month": 2.1,
+                    "DD_3month": -1.5,
+                    ...
+                  }
+                */
+
+                const groupedStocks = {}
+
+                Object.keys(data).forEach((key) => {
+                    const [ticker, period] = key.split("_")
+
+                    if (!groupedStocks[ticker]) {
+                        groupedStocks[ticker] = {
+                            ticker,
+                            name: stockInfo[ticker]?.name || ticker,
+                            logo: stockInfo[ticker]?.logo || "",
+                            predictions: {
+                                d2w: 0,
+                                d1m: 0,
+                                d3m: 0,
+                            },
+                        }
+                    }
+
+                    // Multiply by 100 for percent
+                    const value = data[key] * 100
+
+                    if (period === "2week") {
+                        groupedStocks[ticker].predictions.d2w = value
+                    }
+
+                    if (period === "1month") {
+                        groupedStocks[ticker].predictions.d1m = value
+                    }
+
+                    if (period === "3month") {
+                        groupedStocks[ticker].predictions.d3m = value
+                    }
+                })
+
+                setStocks(Object.values(groupedStocks))
+            } catch (error) {
+                console.error("Error fetching predictions:", error)
+            }
+        }
+
+        fetchPredictions()
     }, [])
 
     return (
@@ -109,11 +171,11 @@ export default function TrendingPage() {
                 </h1>
 
                 <p className="text-lg mb-4 text-gray-700 dark:text-gray-300">
-                    Below are machine learning return predictions for 10 trending companies.
+                    Below are machine learning return predictions for trending companies.
                 </p>
             </section>
 
-            {/* Grid: 2 per row */}
+            {/* Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
                 {stocks.map((stock, index) => (
                     <StockCard key={index} stock={stock} />
