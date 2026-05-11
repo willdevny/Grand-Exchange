@@ -98,13 +98,26 @@ function StockCard({ stock }) {
 // 🔹 Main page
 export default function TrendingPage() {
     const [stocks, setStocks] = useState([])
+    const [loading, setLoading] = useState(true)
+    const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
     useEffect(() => {
         async function fetchPredictions() {
+            const controller = new AbortController()
+            const timeoutId = window.setTimeout(() => controller.abort(), 10000)
+
             try {
+                setLoading(true)
+                setErrorMessage(null)
+
                 const response = await fetch(
-                    "http://71.113.149.31:5000/getPredictions"
+                    "http://71.113.149.31:5000/getPredictions",
+                    { signal: controller.signal }
                 )
+
+                if (!response.ok) {
+                    throw new Error(`Prediction server returned ${response.status}`)
+                }
 
                 const data = await response.json()
 
@@ -153,8 +166,17 @@ export default function TrendingPage() {
                 })
 
                 setStocks(Object.values(groupedStocks))
+
+                if (Object.keys(groupedStocks).length === 0) {
+                    setErrorMessage("The prediction server responded, but did not return any trending stock predictions.")
+                }
             } catch (error) {
                 console.error("Error fetching predictions:", error)
+                setStocks([])
+                setErrorMessage("Could not load trending stock predictions. The Flask prediction server may be offline or not responding.")
+            } finally {
+                window.clearTimeout(timeoutId)
+                setLoading(false)
             }
         }
 
@@ -175,12 +197,47 @@ export default function TrendingPage() {
                 </p>
             </section>
 
+            {loading && (
+                <div className="card p-6 max-w-6xl mx-auto border-sky-500 dark:border-sky-400">
+                    <div className="font-semibold text-lg">
+                        Loading predictions...
+                    </div>
+                    <p className="mt-2 text-gray-700 dark:text-gray-300">
+                        Waiting for the Flask prediction server to respond.
+                    </p>
+                </div>
+            )}
+
+            {!loading && errorMessage && (
+                <div className="card p-6 max-w-6xl mx-auto border-red-500 dark:border-red-400 bg-red-50 dark:bg-red-950/30">
+                    <div className="font-semibold text-lg text-red-800 dark:text-red-200">
+                        Trending predictions are unavailable
+                    </div>
+                    <p className="mt-2 text-red-700 dark:text-red-200">
+                        {errorMessage}
+                    </p>
+                </div>
+            )}
+
+            {!loading && !errorMessage && stocks.length === 0 && (
+                <div className="card p-6 max-w-6xl mx-auto border-yellow-500 dark:border-yellow-400 bg-yellow-50 dark:bg-yellow-950/30">
+                    <div className="font-semibold text-lg text-yellow-900 dark:text-yellow-100">
+                        No predictions to show
+                    </div>
+                    <p className="mt-2 text-yellow-800 dark:text-yellow-100">
+                        The prediction request completed, but no stock predictions were returned.
+                    </p>
+                </div>
+            )}
+
             {/* Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
-                {stocks.map((stock, index) => (
-                    <StockCard key={index} stock={stock} />
-                ))}
-            </div>
+            {stocks.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
+                    {stocks.map((stock, index) => (
+                        <StockCard key={index} stock={stock} />
+                    ))}
+                </div>
+            )}
 
         </div>
     )
